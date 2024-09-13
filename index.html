@@ -1,6 +1,8 @@
 <html>
 
 <head>
+	<meta charset="UTF-8">
+
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-HB0QTXQBF3"></script>
 <script>
@@ -14,36 +16,127 @@
 
 <title>Klaus Mattis</title>
 
-<style>
-	.floating {
-		margin-left: 20%;
-	}
-	.main {
-		margin-top: 10%;
-	}
-	.paper-collapsible {
-		background-color: gainsboro;
-		color: black;
-		cursor: pointer;
-		padding: 18px;
-		width: 100%;
-		border: none;
-		text-align: left;
-		outline: none;
-		font-size: 15px;
-	}
-	.active, .paper-collapsible:hover {
-  		background-color: darkgray;
+  <!-- Google Fonts -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #ecf0f1; /* Light Grayish Blue */
+      margin: 0;
+      padding: 0;
+      color: #34495e; /* Dark Slate Gray for body text */
+    }
+
+    .main {
+      max-width: 800px;
+      margin: 5% auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    h2 {
+      font-size: 1.8em;
+      color: #3498db; /* Bright Blue */
+      margin-top: 40px;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+
+    p, ul {
+      line-height: 1.6;
+      font-size: 1.1em;
+      color: #34495e; /* Dark Slate Gray */
+    }
+
+    a {
+      color: #3498db; /* Bright Blue for links */
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: #5dade2; /* Sky Blue for hover */
+      text-decoration: underline;
+    }
+
+    .button-group {
+      margin: 15px 0;
+    }
+
+    .paper-collapsible {
+      background-color: #3498db; /* Bright Blue */
+      color: white;
+      cursor: pointer;
+      padding: 15px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      font-size: 16px;
+      border-radius: 5px;
+      transition: background-color 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .paper-collapsible:hover, .paper-collapsible.active {
+      background-color: #2c3e50; /* Dark Blue */
+    }
+
+	.paper-collapsible>a, .paper-collapsible>a {
+		color: #004a07; /* Bright Blue for links */
+    }
+
+	.paper-collapsible:hover>a, .paper-collapsible.active>a {
+		color: #009b0d; /* Bright Blue for links */
+    }
+
+    .paper-content {
+      padding: 10px 20px;
+      display: none;
+      background-color: #f7fbfc; /* Very Light Blue */
+      font-size: 14px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+
+    .floating {
+      padding: 5px;
+      background: white;
+      margin-bottom: 5px;
+    }
+
+	.research-interests {
+		list-style: none;
+		padding: 0;
+		margin: 15px 0;
 	}
 
-	.paper-content {
-		padding: 0 18px;
-		display: none;
-		overflow: hidden;
-		background-color: #f1f1f1;
-		font-size: 15px;
+	.research-interests li {
+		font-size: 0.9em; /* Smaller font size */
+		padding: 6px 10px; /* Reduced padding */
+		margin-bottom: 8px;
+		background-color: #f7fbfc; /* Light blue background */
+		transition: background-color 0.2s ease;
 	}
-</style>
+
+	.research-interests li:hover {
+		background-color: #e1f5fe; /* Lighter blue on hover */
+	}
+
+    /* Mobile Styles */
+    @media screen and (max-width: 768px) {
+      .main {
+        margin: 10% auto;
+        padding: 10px;
+      }
+
+      h2 {
+        font-size: 1.5em;
+      }
+    }
+  </style>
 
 </head>
 
@@ -57,10 +150,10 @@
 		<div class="floating">
 			<h2>Research Interests</h2>
 			My research interests are 
-			<ul>
-				<li>Unstable and stable motivic homotopy theory,</li>
-				<li>Higher categories, in particular higher topoi, and</li>
-				<li>Algebraic K-theory.</li>
+			<ul class="research-interests">
+				<li>Unstable and stable motivic homotopy theory</li>
+				<li>Higher categories, particularly higher topoi</li>
+				<li>Algebraic K-theory</li>
 			</ul>
 		</div>
 		<div class="floating">
@@ -106,7 +199,7 @@
 			<h2>Talks</h2>
 			<ul>
 				<li>Unstable p-completion in motivic homotopy theory at <a href="https://younghomseminar.github.io">YoungHom</a> <a href="./files/young-hom.pdf">(Slides)</a></li>
-				<li>Proof of the Hopkins-Morel-Hoyois Theorem at <a href="https://iwoat.github.io/school2024">International Workshop on Algebraic Topology, Shanghai<a/></li>
+				<li>Proof of the Hopkins-Morel-Hoyois Theorem at <a href="https://iwoat.github.io/school2024">International Workshop on Algebraic Topology, Shanghai</a></li>
 			</ul>
 		</div>
 		<div class="floating">
