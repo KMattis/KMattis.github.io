@@ -164,6 +164,17 @@
       margin-top: 10px;
     }
 
+    /* Target the table using a class for specificity */
+    .styled-talks-table th,
+    .styled-talks-table td {
+      vertical-align: top; /* Align content to the top */
+    }
+
+    /* Keep the non-wrapping style for the first column */
+    .styled-talks-table .date-column {
+      white-space: nowrap;
+    }
+
     /* Mobile Styles */
     @media screen and (max-width: 768px) {
       .main {
@@ -342,17 +353,30 @@
     <!-- Talks -->
     <div class="floating">
       <h2>Talks</h2>
-      <ul>
-        <li>
-          Unstable \(p\)-completion in motivic homotopy theory at 
-          <a href="https://younghomseminar.github.io">YoungHom</a> 
-          <a href="./files/young-hom.pdf">(Slides)</a>
-        </li>
-        <li>
-          Proof of the Hopkins-Morel-Hoyois Theorem at 
-          <a href="https://iwoat.github.io/school2024">International Workshop on Algebraic Topology, Shanghai</a>
-        </li>
-      </ul>
+      <table class="styled-talks-table">
+        <tbody>
+          <tr>
+            <td class="date-column">04/25</td>
+            <td><i>Étale rigidity for motivic spaces</i></td>
+            <td>ENS Lyon</td>
+          </tr>
+          <tr>
+            <td class="date-column">04/25</td>
+            <td><i>Étale rigidity for motivic spaces</i></td>
+            <td>University of Toronto</td>
+          </tr>
+          <tr>
+            <td class="date-column">06/24</td>
+            <td><i>Proof of the Hopkins-Morel-Hoyois Theorem</i></td>
+            <td><a href="https://iwoat.github.io/school2024">International Workshop on Algebraic Topology, Shanghai</a></td>
+          </tr>
+          <tr>
+            <td class="date-column">02/24</td>
+            <td><i>Unstable \(p\)-completion in motivic homotopy theory</i> <a href="./files/young-hom.pdf">(Slides)</a></td>
+            <td><a href="https://younghomseminar.github.io">YoungHom</a></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- Academic Service -->
