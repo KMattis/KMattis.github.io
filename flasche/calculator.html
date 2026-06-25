@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Flasche bitte – Kampfsimulator</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #f7f7f7;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    .fighters {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      box-sizing: border-box;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #222;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background: #444;
+    }
+
+    .actions {
+      text-align: center;
+    }
+
+    #result, #log {
+      margin-top: 24px;
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    #log {
+      white-space: pre-line;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .winner {
+      font-weight: bold;
+      font-size: 20px;
+      color: darkgreen;
+    }
+  </style>
+</head>
+<body>
+  <h1>Kampfsimulator</h1>
+
+  <p>
+    Schadensformel:
+    <strong>Schaden = round(A × 15 / (15 + D))</strong>
+  </p>
+
+  <div class="fighters">
+    <div class="card">
+      <h2>Spieler 1</h2>
+
+      <label>
+        Health
+        <input id="hp1" type="number" value="100" min="1">
+      </label>
+
+      <label>
+        Angriff
+        <input id="atk1" type="number" value="20" min="0">
+      </label>
+
+      <label>
+        Verteidigung
+        <input id="def1" type="number" value="10" min="0">
+      </label>
+    </div>
+
+    <div class="card">
+      <h2>Spieler 2 / Gegner</h2>
+
+      <label>
+        Health
+        <input id="hp2" type="number" value="100" min="1">
+      </label>
+
+      <label>
+        Angriff
+        <input id="atk2" type="number" value="20" min="0">
+      </label>
+
+      <label>
+        Verteidigung
+        <input id="def2" type="number" value="10" min="0">
+      </label>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button onclick="simulateFight()">Kampf simulieren</button>
+  </div>
+
+  <div id="result"></div>
+  <div id="log"></div>
+
+  <script>
+    function damage(attack, defense) {
+      return Math.round(attack * 15 / (15 + defense));
+    }
+
+    function getNumber(id) {
+      return Number(document.getElementById(id).value);
+    }
+
+    function simulateFight() {
+      let hp1 = getNumber("hp1");
+      let atk1 = getNumber("atk1");
+      let def1 = getNumber("def1");
+
+      let hp2 = getNumber("hp2");
+      let atk2 = getNumber("atk2");
+      let def2 = getNumber("def2");
+
+      const startHp1 = hp1;
+      const startHp2 = hp2;
+
+      let round = 1;
+      let log = "";
+
+      while (hp1 > 0 && hp2 > 0 && round <= 1000) {
+        // Spieler 1 greift an
+        let dmg1 = damage(atk1, def2);
+        hp2 -= dmg1;
+        if (hp2 < 0) hp2 = 0;
+
+        log += `Runde ${round}: Spieler 1 greift an und macht ${dmg1} Schaden. Gegner hat noch ${hp2} HP.\n`;
+
+        if (hp2 <= 0) break;
+
+        // Spieler 2 greift an
+        let dmg2 = damage(atk2, def1);
+        hp1 -= dmg2;
+        if (hp1 < 0) hp1 = 0;
+
+        log += `Runde ${round}: Gegner greift an und macht ${dmg2} Schaden. Spieler 1 hat noch ${hp1} HP.\n\n`;
+
+        round++;
+      }
+
+      let resultText = "";
+
+      if (hp1 > 0 && hp2 <= 0) {
+        resultText = `<div class="winner">Spieler 1 gewinnt!</div>`;
+      } else if (hp2 > 0 && hp1 <= 0) {
+        resultText = `<div class="winner">Gegner gewinnt!</div>`;
+      } else {
+        resultText = `<div class="winner">Unentschieden oder Kampf abgebrochen.</div>`;
+      }
+
+      resultText += `
+        <p>
+          Endstand:<br>
+          Spieler 1: ${hp1} / ${startHp1} HP<br>
+          Gegner: ${hp2} / ${startHp2} HP<br>
+          Runden: ${round}
+        </p>
+      `;
+
+      document.getElementById("result").innerHTML = resultText;
+      document.getElementById("log").textContent = log;
+    }
+  </script>
+</body>
+</html>
