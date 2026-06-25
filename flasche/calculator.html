@@ -6,7 +6,7 @@
   <style>
     body {
       font-family: system-ui, sans-serif;
-      max-width: 800px;
+      max-width: 950px;
       margin: 40px auto;
       padding: 0 16px;
       background: #f7f7f7;
@@ -60,7 +60,7 @@
       text-align: center;
     }
 
-    #result, #log {
+    #result, #log, #info {
       margin-top: 24px;
       background: white;
       padding: 16px;
@@ -70,8 +70,10 @@
 
     #log {
       white-space: pre-line;
-      max-height: 400px;
+      max-height: 450px;
       overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
     }
 
     .winner {
@@ -79,15 +81,31 @@
       font-size: 20px;
       color: darkgreen;
     }
+
+    .formula {
+      text-align: center;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .sim-card {
+      max-width: 300px;
+      margin: 20px auto;
+      background: white;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
   </style>
 </head>
 <body>
   <h1>Kampfsimulator</h1>
 
-  <p>
-    Schadensformel:
-    <strong>Schaden = round(A × 15 / (15 + D))</strong>
-  </p>
+  <div class="formula">
+    <div><strong>Schaden = round(A × 15 / (15 + D))</strong></div>
+    <div><strong>Ausweichchance = E / (E + 270)</strong></div>
+    <div><strong>Speed:</strong> Höherer Wert greift zuerst an. Bei Gleichstand Spieler 1.</div>
+  </div>
 
   <div class="fighters">
     <div class="card">
@@ -106,6 +124,16 @@
       <label>
         Verteidigung
         <input id="def1" type="number" value="10" min="0">
+      </label>
+
+      <label>
+        Ausweichen
+        <input id="eva1" type="number" value="23" min="0">
+      </label>
+
+      <label>
+        Speed
+        <input id="spd1" type="number" value="10" min="0">
       </label>
     </div>
 
@@ -126,13 +154,32 @@
         Verteidigung
         <input id="def2" type="number" value="10" min="0">
       </label>
+
+      <label>
+        Ausweichen
+        <input id="eva2" type="number" value="23" min="0">
+      </label>
+
+      <label>
+        Speed
+        <input id="spd2" type="number" value="10" min="0">
+      </label>
     </div>
   </div>
 
-  <div class="actions">
-    <button onclick="simulateFight()">Kampf simulieren</button>
+  <div class="sim-card">
+    <label>
+      Anzahl Simulationen
+      <input id="numSims" type="number" value="10000" min="1">
+    </label>
   </div>
 
+  <div class="actions">
+    <button onclick="simulateOneFightAndShowLog()">Einzelkampf simulieren</button>
+    <button onclick="simulateManyFights()">n Kämpfe simulieren</button>
+  </div>
+
+  <div id="info"></div>
   <div id="result"></div>
   <div id="log"></div>
 
@@ -141,50 +188,155 @@
       return Math.round(attack * 15 / (15 + defense));
     }
 
+    function dodgeChance(evasion) {
+      return evasion / (evasion + 270);
+    }
+
+    function percent(x) {
+      return (100 * x).toFixed(2) + "%";
+    }
+
     function getNumber(id) {
       return Number(document.getElementById(id).value);
     }
 
-    function simulateFight() {
-      let hp1 = getNumber("hp1");
-      let atk1 = getNumber("atk1");
-      let def1 = getNumber("def1");
+    function readFighters() {
+      const p1 = {
+        name: "Spieler 1",
+        hp: getNumber("hp1"),
+        maxHp: getNumber("hp1"),
+        atk: getNumber("atk1"),
+        def: getNumber("def1"),
+        eva: getNumber("eva1"),
+        spd: getNumber("spd1")
+      };
 
-      let hp2 = getNumber("hp2");
-      let atk2 = getNumber("atk2");
-      let def2 = getNumber("def2");
+      const p2 = {
+        name: "Gegner",
+        hp: getNumber("hp2"),
+        maxHp: getNumber("hp2"),
+        atk: getNumber("atk2"),
+        def: getNumber("def2"),
+        eva: getNumber("eva2"),
+        spd: getNumber("spd2")
+      };
 
-      const startHp1 = hp1;
-      const startHp2 = hp2;
+      return { p1, p2 };
+    }
+
+    function cloneFighter(f) {
+      return {
+        name: f.name,
+        hp: f.maxHp,
+        maxHp: f.maxHp,
+        atk: f.atk,
+        def: f.def,
+        eva: f.eva,
+        spd: f.spd
+      };
+    }
+
+    function attack(attacker, defender, roundLabel, withLog) {
+      const chance = dodgeChance(defender.eva);
+
+      if (Math.random() < chance) {
+        return {
+          damage: 0,
+          dodged: true,
+          text: withLog
+            ? `${roundLabel}: ${attacker.name} greift an, aber ${defender.name} weicht aus.`
+            : ""
+        };
+      }
+
+      const dmg = damage(attacker.atk, defender.def);
+      defender.hp -= dmg;
+      if (defender.hp < 0) defender.hp = 0;
+
+      return {
+        damage: dmg,
+        dodged: false,
+        text: withLog
+          ? `${roundLabel}: ${attacker.name} greift an und macht ${dmg} Schaden. ${defender.name} hat noch ${defender.hp} HP.`
+          : ""
+      };
+    }
+
+    function simulateFight(baseP1, baseP2, withLog = false) {
+      const p1 = cloneFighter(baseP1);
+      const p2 = cloneFighter(baseP2);
+
+      let first, second;
+
+      if (p1.spd >= p2.spd) {
+        first = p1;
+        second = p2;
+      } else {
+        first = p2;
+        second = p1;
+      }
 
       let round = 1;
       let log = "";
 
-      while (hp1 > 0 && hp2 > 0 && round <= 1000) {
-        // Spieler 1 greift an
-        let dmg1 = damage(atk1, def2);
-        hp2 -= dmg1;
-        if (hp2 < 0) hp2 = 0;
+      while (p1.hp > 0 && p2.hp > 0 && round <= 1000) {
+        const result1 = attack(first, second, `Runde ${round}`, withLog);
+        if (withLog) log += result1.text + "\n";
 
-        log += `Runde ${round}: Spieler 1 greift an und macht ${dmg1} Schaden. Gegner hat noch ${hp2} HP.\n`;
+        if (second.hp <= 0) break;
 
-        if (hp2 <= 0) break;
-
-        // Spieler 2 greift an
-        let dmg2 = damage(atk2, def1);
-        hp1 -= dmg2;
-        if (hp1 < 0) hp1 = 0;
-
-        log += `Runde ${round}: Gegner greift an und macht ${dmg2} Schaden. Spieler 1 hat noch ${hp1} HP.\n\n`;
+        const result2 = attack(second, first, `Runde ${round}`, withLog);
+        if (withLog) log += result2.text + "\n\n";
 
         round++;
       }
 
+      let winner = "draw";
+
+      if (p1.hp > 0 && p2.hp <= 0) {
+        winner = "p1";
+      } else if (p2.hp > 0 && p1.hp <= 0) {
+        winner = "p2";
+      }
+
+      return {
+        winner,
+        p1Hp: p1.hp,
+        p2Hp: p2.hp,
+        rounds: round,
+        log
+      };
+    }
+
+    function showInfo(p1, p2) {
+      const dmg1to2 = damage(p1.atk, p2.def);
+      const dmg2to1 = damage(p2.atk, p1.def);
+      const eva1 = dodgeChance(p1.eva);
+      const eva2 = dodgeChance(p2.eva);
+
+      let firstName = p1.spd >= p2.spd ? "Spieler 1" : "Gegner";
+
+      document.getElementById("info").innerHTML = `
+        <strong>Kampfwerte:</strong><br>
+        Spieler 1 macht ${dmg1to2} Schaden, falls der Gegner nicht ausweicht.<br>
+        Gegner macht ${dmg2to1} Schaden, falls Spieler 1 nicht ausweicht.<br>
+        Spieler 1 Ausweichchance: ${percent(eva1)}<br>
+        Gegner Ausweichchance: ${percent(eva2)}<br>
+        Erster Angriff: ${firstName}
+      `;
+    }
+
+    function simulateOneFightAndShowLog() {
+      const { p1, p2 } = readFighters();
+      showInfo(p1, p2);
+
+      const result = simulateFight(p1, p2, true);
+
       let resultText = "";
 
-      if (hp1 > 0 && hp2 <= 0) {
+      if (result.winner === "p1") {
         resultText = `<div class="winner">Spieler 1 gewinnt!</div>`;
-      } else if (hp2 > 0 && hp1 <= 0) {
+      } else if (result.winner === "p2") {
         resultText = `<div class="winner">Gegner gewinnt!</div>`;
       } else {
         resultText = `<div class="winner">Unentschieden oder Kampf abgebrochen.</div>`;
@@ -193,14 +345,67 @@
       resultText += `
         <p>
           Endstand:<br>
-          Spieler 1: ${hp1} / ${startHp1} HP<br>
-          Gegner: ${hp2} / ${startHp2} HP<br>
-          Runden: ${round}
+          Spieler 1: ${result.p1Hp} / ${p1.maxHp} HP<br>
+          Gegner: ${result.p2Hp} / ${p2.maxHp} HP<br>
+          Runden: ${result.rounds}
         </p>
       `;
 
       document.getElementById("result").innerHTML = resultText;
-      document.getElementById("log").textContent = log;
+      document.getElementById("log").textContent = result.log;
+    }
+
+    function simulateManyFights() {
+      const { p1, p2 } = readFighters();
+      showInfo(p1, p2);
+
+      const n = Math.max(1, Math.floor(getNumber("numSims")));
+
+      let p1Wins = 0;
+      let p2Wins = 0;
+      let draws = 0;
+      let totalRounds = 0;
+      let totalP1Hp = 0;
+      let totalP2Hp = 0;
+
+      for (let i = 0; i < n; i++) {
+        const result = simulateFight(p1, p2, false);
+
+        if (result.winner === "p1") {
+          p1Wins++;
+        } else if (result.winner === "p2") {
+          p2Wins++;
+        } else {
+          draws++;
+        }
+
+        totalRounds += result.rounds;
+        totalP1Hp += result.p1Hp;
+        totalP2Hp += result.p2Hp;
+      }
+
+      const p1WinRate = p1Wins / n;
+      const p2WinRate = p2Wins / n;
+      const drawRate = draws / n;
+
+      document.getElementById("result").innerHTML = `
+        <div class="winner">Simulation abgeschlossen</div>
+        <p>
+          Anzahl Kämpfe: ${n}<br><br>
+
+          <strong>Gewinnwahrscheinlichkeit:</strong><br>
+          Spieler 1: ${percent(p1WinRate)} (${p1Wins} Siege)<br>
+          Gegner: ${percent(p2WinRate)} (${p2Wins} Siege)<br>
+          Unentschieden/Abbruch: ${percent(drawRate)} (${draws})<br><br>
+
+          Durchschnittliche Rundenzahl: ${(totalRounds / n).toFixed(2)}<br>
+          Durchschnittliche Rest-HP Spieler 1: ${(totalP1Hp / n).toFixed(2)}<br>
+          Durchschnittliche Rest-HP Gegner: ${(totalP2Hp / n).toFixed(2)}
+        </p>
+      `;
+
+      document.getElementById("log").textContent =
+        "Für Mehrfachsimulationen wird kein Kampflog ausgegeben. Nutze „Einzelkampf simulieren“ für ein detailliertes Log.";
     }
   </script>
 </body>
