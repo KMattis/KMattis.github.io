@@ -298,19 +298,19 @@
               <td><input id="def2" type="number" value="10" min="1" max="999" step="1" aria-label="Verteidigung – Gegner"></td>
             </tr>
             <tr>
-              <th scope="row">Ausweichen<span id="evasionNote" class="stat-note">Formel noch nicht optimal.</span></th>
-              <td><input id="eva1" aria-describedby="evasionNote" type="number" value="23" min="0" max="999" step="1" aria-label="Ausweichen – Spieler"></td>
-              <td><input id="eva2" aria-describedby="evasionNote" type="number" value="23" min="0" max="999" step="1" aria-label="Ausweichen – Gegner"></td>
+              <th scope="row">Ausweichen</th>
+              <td><input id="eva1" type="number" value="23" min="0" max="999" step="1" aria-label="Ausweichen – Spieler"></td>
+              <td><input id="eva2" type="number" value="23" min="0" max="999" step="1" aria-label="Ausweichen – Gegner"></td>
             </tr>
             <tr>
-              <th scope="row">Geschwindigkeit<span id="speedNote" class="stat-note">Noch keine Doppeltreffer, nur Reihenfolge.</span></th>
-              <td><input id="spd1" aria-describedby="speedNote" type="number" value="10" min="0" max="999" step="1" aria-label="Geschwindigkeit – Spieler"></td>
-              <td><input id="spd2" aria-describedby="speedNote" type="number" value="10" min="0" max="999" step="1" aria-label="Geschwindigkeit – Gegner"></td>
+              <th scope="row">Geschwindigkeit</th>
+              <td><input id="spd1" type="number" value="10" min="0" max="999" step="1" aria-label="Geschwindigkeit – Spieler"></td>
+              <td><input id="spd2" type="number" value="10" min="0" max="999" step="1" aria-label="Geschwindigkeit – Gegner"></td>
             </tr>
             <tr>
-              <th scope="row">Kritisch<span id="criticalNote" class="stat-note">Noch nicht in der Kampfberechnung verwendet.</span></th>
-              <td><input id="crit1" aria-describedby="criticalNote" type="number" value="1" min="0" max="999" step="1" aria-label="Kritisch – Spieler"></td>
-              <td><input id="crit2" aria-describedby="criticalNote" type="number" value="1" min="0" max="999" step="1" aria-label="Kritisch – Gegner"></td>
+              <th scope="row">Kritisch</th>
+              <td><input id="crit1" type="number" value="1" min="0" max="999" step="1" aria-label="Kritisch – Spieler"></td>
+              <td><input id="crit2" type="number" value="1" min="0" max="999" step="1" aria-label="Kritisch – Gegner"></td>
             </tr>
         </tbody>
       </table>
@@ -318,6 +318,7 @@
 
     <section class="card" aria-labelledby="combatValuesTitle">
       <h2 id="combatValuesTitle">Kampfwerte</h2>
+      <p class="stat-note">Alle berechneten Werte sind vorläufige Schätzungen.</p>
       <table class="compact-table fighter-table combat-table" aria-label="Berechnete Kampfwerte für Spieler und Gegner">
         <thead>
           <tr><th scope="col">Wert</th><th scope="col">Spieler</th><th scope="col">Gegner</th></tr>
@@ -329,24 +330,24 @@
               <td id="calculatedDamage2" class="calculated-value">—</td>
             </tr>
             <tr>
-              <th scope="row">Schaden Kritisch<span class="stat-note">Aktuelle beste Schätzung, noch unbestätigt.</span></th>
+              <th scope="row">Schaden Kritisch<span class="stat-note">Vorläufige Schätzung.</span></th>
               <td id="calculatedCriticalDamage1" class="calculated-value">—</td>
               <td id="calculatedCriticalDamage2" class="calculated-value">—</td>
             </tr>
             <tr>
-              <th scope="row">Chance Ausweichen<span class="stat-note">Formel noch nicht optimal.</span></th>
+              <th scope="row">Chance Ausweichen<span class="stat-note">Vorläufige Schätzung.</span></th>
               <td id="calculatedDodge1" class="calculated-value">—</td>
               <td id="calculatedDodge2" class="calculated-value">—</td>
             </tr>
             <tr>
-              <th scope="row">Chance Doppelter Hit<span class="stat-note">Formel aktuell unbekannt.</span></th>
-              <td class="calculated-value">N/A</td>
-              <td class="calculated-value">N/A</td>
+              <th scope="row">Chance Doppelter Hit<span class="stat-note">Vorläufige Schätzung.</span></th>
+              <td id="calculatedDouble1" class="calculated-value">—</td>
+              <td id="calculatedDouble2" class="calculated-value">—</td>
             </tr>
             <tr>
-              <th scope="row">Chance Kritischer Hit<span class="stat-note">Formel aktuell unbekannt.</span></th>
-              <td class="calculated-value">N/A</td>
-              <td class="calculated-value">N/A</td>
+              <th scope="row">Chance Kritischer Hit<span class="stat-note">Vorläufige Schätzung.</span></th>
+              <td id="calculatedCriticalChance1" class="calculated-value">—</td>
+              <td id="calculatedCriticalChance2" class="calculated-value">—</td>
             </tr>
             <tr>
               <th scope="row">Erster Angriff</th>
@@ -428,13 +429,73 @@
       return Math.round(attack * 15 / (15 + defense));
     }
 
-    // Display-only estimate; critical hits are not included in fight probabilities yet.
+    // Provisional damage model, shared by the display and combat calculations.
     function criticalDamage(attack, defense, critical) {
       return Math.round(damage(attack, defense) * (2 + critical / 100));
     }
 
     function dodgeChance(evasion) {
-      return evasion / (evasion + 270);
+      return evasion / (evasion + 100);
+    }
+
+    // Provisional estimates from fight_analysis/formulas.json (2026-11-02).
+    // Rounded fitted rational constants: dodge 106.398 -> 100, double 157.899 -> 160, critical 103.449 -> 100.
+    function doubleHitChance(speed) {
+      return speed / (speed + 160);
+    }
+
+    function criticalHitChance(critical) {
+      return critical / (critical + 100);
+    }
+
+    function combatTurnProfile(attacker, defender) {
+      const baseDamage = damage(attacker.atk, defender.def);
+      const critDamage = criticalDamage(attacker.atk, defender.def, attacker.crit);
+      const hit = 1 - dodgeChance(defender.eva);
+      const crit = criticalHitChance(attacker.crit);
+      const extra = doubleHitChance(attacker.spd);
+      const attack = new Map(), turn = new Map();
+      const add = (distribution, amount, probability) => {
+        if (probability > 0) distribution.set(amount, (distribution.get(amount) || 0) + probability);
+      };
+      add(attack, 0, 1 - hit);
+      add(attack, baseDamage, hit * (1 - crit));
+      add(attack, critDamage, hit * crit);
+      for (const [amount, probability] of attack) {
+        add(turn, amount, (1 - extra) * probability);
+        for (const [secondAmount, secondProbability] of attack) {
+          add(turn, amount + secondAmount, extra * probability * secondProbability);
+        }
+      }
+      // For survival and victory, total turn damage can merge the two attacks:
+      // if the primary attack is lethal, every hypothetical second outcome is
+      // absorbed into that same victory. No later turn or attack is credited.
+      const outcomes = [...turn].map(([amount, probability]) => ({ damage: amount, probability }))
+        .sort((a, b) => a.damage - b.damage);
+      const gcd = (a, b) => b ? gcd(b, a % b) : a;
+      const unit = outcomes.reduce((value, outcome) => gcd(value, outcome.damage), 0);
+      return { baseDamage, critDamage, hit, crit, extra, outcomes, unit,
+        miss: turn.get(0) || 0,
+        expectedDamagePerAttack: hit * ((1 - crit) * baseDamage + crit * critDamage) };
+    }
+
+    function survivalTurnExpectations(maxHp, profile) {
+      const turns = new Float64Array(maxHp + 1);
+      const progress = 1 - profile.miss;
+      if (profile.unit === 0) {
+        turns.fill(Infinity, 1);
+        return turns;
+      }
+      for (let hp = 1; hp <= maxHp; hp++) {
+        let expectation = 1;
+        for (const outcome of profile.outcomes) {
+          if (outcome.damage > 0 && outcome.damage < hp) {
+            expectation += outcome.probability * turns[hp - outcome.damage];
+          }
+        }
+        turns[hp] = expectation / progress;
+      }
+      return turns;
     }
 
     function percent(x) {
@@ -495,17 +556,18 @@
     }
 
     function calculateTreppenbossCombat(player, boss) {
-      const playerDamage = damage(player.atk, boss.def);
-      const bossDamage = damage(boss.atk, player.def);
-      const playerHitChance = 270 / (boss.eva + 270);
-      const bossHitChance = 270 / (player.eva + 270);
-      const hitsUntilDefeat = bossDamage > 0 ? Math.ceil(player.maxHp / bossDamage) : Infinity;
-      const avgRounds = hitsUntilDefeat / bossHitChance;
-      // If the boss starts, its final lethal attack prevents our last attack.
-      const avgAttacks = avgRounds - (player.spd < boss.spd ? 1 : 0);
-      const avgLandedHits = avgAttacks * playerHitChance;
-      const avgDamage = playerDamage === 0 ? 0 : avgLandedHits * playerDamage;
-      return { mode: "treppenboss", avgDamage, avgRounds, avgAttacks, avgLandedHits, hitsUntilDefeat, playerDamage, bossDamage, playerHitChance, bossHitChance };
+      const playerProfile = combatTurnProfile(player, boss);
+      const bossProfile = combatTurnProfile(boss, player);
+      const avgRounds = survivalTurnExpectations(player.maxHp, bossProfile)[player.maxHp];
+      // A lethal boss attack ends its turn immediately and prevents our next
+      // turn. Our own turns always finish, because the boss has infinite HP.
+      const avgTurns = avgRounds - (player.spd < boss.spd ? 1 : 0);
+      const avgAttacks = avgTurns * (1 + playerProfile.extra);
+      const avgLandedHits = avgAttacks * playerProfile.hit;
+      const avgDamage = playerProfile.expectedDamagePerAttack === 0 ? 0 : avgAttacks * playerProfile.expectedDamagePerAttack;
+      return { mode: "treppenboss", avgDamage, avgRounds, avgTurns, avgAttacks, avgLandedHits,
+        playerDamage: playerProfile.baseDamage, bossDamage: bossProfile.baseDamage,
+        playerProfile, bossProfile };
     }
 
     function treppenbossResultHtml(player, boss, result) {
@@ -520,18 +582,21 @@
             <div class="outcome-card"><div class="reserve-value">${formatReserve(result.avgLandedHits)}</div><p class="muted">Ø gelandete Treffer</p></div>
           </div>
           ${result.bossDamage === 0 ? '<p class="muted">Der Treppenboss verursacht mit der aktuellen Formel keinen Schaden. Der Kampf endet nicht; ∞ steht für einen unbegrenzten Erwartungswert.</p>' : ""}
-          <p class="muted">Die Ausweichchancen und die Angriffsreihenfolge sind berücksichtigt. Kritische Treffer und Doppeltreffer sind noch nicht enthalten.</p>
+          <p class="muted">Ausweichen, kritische Treffer, Doppeltreffer und die Angriffsreihenfolge sind berücksichtigt. Alle Formeln sind vorläufig.</p>
         </section>
         <details class="reserve-explanation calculation-details">
           <summary>Verwendete Formeln und Werte</summary>
           <ul class="formula-list">
             <li><strong>HP:</strong> Spieler ${player.maxHp}, Treppenboss ∞.</li>
             <li><strong>Grundschaden:</strong> round(Angriff × 15 / (15 + gegnerische Verteidigung)). Spieler ${result.playerDamage}, Treppenboss ${result.bossDamage}.</li>
-            <li><strong>Trefferchance:</strong> 270 / (Ausweichen des Verteidigers + 270). Spieler ${percent(result.playerHitChance)}, Treppenboss ${percent(result.bossHitChance)}.</li>
-            <li><strong>Treffer bis zur Niederlage:</strong> ceil(Spieler-HP / Boss-Grundschaden) = ${formatReserve(result.hitsUntilDefeat, 0)}.</li>
-            <li><strong>Ø Runden:</strong> Treffer bis zur Niederlage / Boss-Trefferchance.</li>
-            <li><strong>Ø eigene Angriffe:</strong> Ø Runden${player.spd < boss.spd ? " − 1, da der Treppenboss zuerst angreift" : ", da der Spieler zuerst angreift (auch bei gleicher Geschwindigkeit)"}.</li>
-            <li><strong>Ø Gesamtschaden:</strong> Ø eigene Angriffe × Spieler-Trefferchance × Spieler-Grundschaden.</li>
+            <li><strong>Trefferchance:</strong> 100 / (Ausweichen des Verteidigers + 100). Spieler ${percent(result.playerProfile.hit)}, Treppenboss ${percent(result.bossProfile.hit)}.</li>
+            <li><strong>Kritische Trefferchance:</strong> Kritisch / (Kritisch + 100), nach einem erfolgreichen Treffer. Spieler ${percent(result.playerProfile.crit)}, Treppenboss ${percent(result.bossProfile.crit)}.</li>
+            <li><strong>Doppeltrefferchance:</strong> Geschwindigkeit / (Geschwindigkeit + 160). Spieler ${percent(result.playerProfile.extra)}, Treppenboss ${percent(result.bossProfile.extra)}.</li>
+            <li><strong>Zugablauf:</strong> Angriff mit Ausweich- und anschließendem Kritisch-Wurf; falls beide überleben, ein Geschwindigkeitswurf für höchstens einen Zusatzangriff mit eigenen Würfen.</li>
+            <li><strong>Ø Runden bis zur Niederlage:</strong> Aus der Verteilung aller möglichen Boss-Zugschäden berechnet, einschließlich kritischer Treffer und Zusatzangriffe.</li>
+            <li><strong>Ø eigene Züge:</strong> ${formatReserve(result.avgTurns)}; Ø Runden${player.spd < boss.spd ? " − 1, da der Treppenboss zuerst angreift" : ", da der Spieler zuerst angreift (auch bei gleicher Geschwindigkeit)"}.</li>
+            <li><strong>Ø eigene Angriffsversuche:</strong> Ø eigene Züge × (1 + Doppeltrefferchance) = ${formatReserve(result.avgAttacks)}.</li>
+            <li><strong>Ø Gesamtschaden:</strong> Ø eigene Angriffsversuche × Trefferchance × ((1 − kritische Trefferchance) × Grundschaden + kritische Trefferchance × kritischer Schaden).</li>
           </ul>
         </details>`;
     }
@@ -542,15 +607,14 @@
       const second = firstIsPlayer ? p2 : p1;
       const firstSide = firstIsPlayer ? "p1" : "p2";
       const secondSide = firstIsPlayer ? "p2" : "p1";
-      const firstDamage = damage(first.atk, second.def);
-      const secondDamage = damage(second.atk, first.def);
-      const firstHit = 270 / (second.eva + 270);
-      const secondHit = 270 / (first.eva + 270);
-      const firstNeeds = firstDamage ? Math.ceil(second.maxHp / firstDamage) : Infinity;
-      const secondNeeds = secondDamage ? Math.ceil(first.maxHp / secondDamage) : Infinity;
+      const firstProfile = combatTurnProfile(first, second);
+      const secondProfile = combatTurnProfile(second, first);
+      const firstSurvival = survivalTurnExpectations(first.maxHp, secondProfile);
+      const secondSurvival = survivalTurnExpectations(second.maxHp, firstProfile);
       const outcomes = [];
-      function addOutcome(side, hp, probability, winner, opponent) {
-        if (probability > 0) outcomes.push({ winner: side, probability, extraRounds: expectedExtraRounds(hp, winner, opponent) });
+      function addOutcome(side, hp, probability, survival) {
+        if (probability > 0) outcomes.push({ winner: side, probability, remainingHp: hp,
+          extraRounds: Math.max(0, survival[hp] - 1) });
       }
       function finish(avgRounds, drawRate = 0) {
         const total = outcomes.reduce((sum, item) => sum + item.probability, 0) + drawRate;
@@ -558,78 +622,79 @@
         for (const item of outcomes) item.probability /= total;
         const p1WinRate = outcomes.filter(item => item.winner === "p1").reduce((sum, item) => sum + item.probability, 0);
         const p2WinRate = outcomes.filter(item => item.winner === "p2").reduce((sum, item) => sum + item.probability, 0);
-        return { p1WinRate, p2WinRate, drawRate: drawRate / total, avgRounds, outcomes };
+        return { p1WinRate, p2WinRate, drawRate: drawRate / total, avgRounds: avgRounds / total, outcomes };
       }
-      if (!firstDamage && !secondDamage) return finish(Infinity, 1);
-      if (!secondDamage) {
-        addOutcome(firstSide, first.maxHp, 1, first, second);
-        return finish(firstNeeds / firstHit);
+      if (!firstProfile.unit && !secondProfile.unit) return finish(Infinity, 1);
+      if (!secondProfile.unit) {
+        addOutcome(firstSide, first.maxHp, 1, firstSurvival);
+        return finish(secondSurvival[second.maxHp]);
       }
-      if (!firstDamage) {
-        addOutcome(secondSide, second.maxHp, 1, second, first);
-        return finish(secondNeeds / secondHit);
+      if (!firstProfile.unit) {
+        addOutcome(secondSide, second.maxHp, 1, secondSurvival);
+        return finish(firstSurvival[first.maxHp]);
       }
-      if (firstHit === 1 && secondHit === 1) {
-        if (firstNeeds <= secondNeeds) {
-          addOutcome(firstSide, first.maxHp - (firstNeeds - 1) * secondDamage, 1, first, second);
-        } else {
-          addOutcome(secondSide, second.maxHp - secondNeeds * firstDamage, 1, second, first);
-        }
-        return finish(Math.min(firstNeeds, secondNeeds));
-      }
-      if (firstNeeds * secondNeeds > 4000000 || firstNeeds + secondNeeds > 100000) {
+      // Track cumulative damage in units of its greatest common divisor. This
+      // retains exact HP while avoiding unreachable intermediate damage states.
+      const firstNeeds = Math.ceil(second.maxHp / firstProfile.unit);
+      const secondNeeds = Math.ceil(first.maxHp / secondProfile.unit);
+      if (firstNeeds * secondNeeds > 4000000) {
         throw new RangeError("Diese Werte benötigen zu viele Trefferzustände für die exakte Berechnung im Browser. Bitte kleinere HP- oder größere Angriffswerte verwenden.");
       }
 
-      // State (i,j): first has landed i hits, second j hits; a new round starts.
-      // Remove the both-miss self-loop analytically. The remaining transitions
-      // always increase i or j, so two rows cover the entire infinite-duration fight.
-      const progress = firstHit + secondHit - firstHit * secondHit;
-      const firstOnly = firstHit * (1 - secondHit) / progress;
-      const secondOnly = (1 - firstHit) * secondHit / progress;
-      const bothHit = firstHit * secondHit / progress;
-      const firstWins = new Float64Array(secondNeeds);
-      const secondWins = new Float64Array(firstNeeds);
-      let row = new Float64Array(secondNeeds);
-      let next = new Float64Array(secondNeeds);
-      row[0] = 1;
+      // At each state a round starts with the faster bottle (player on ties).
+      // Remove the both-zero-damage round analytically; every other transition
+      // increases damage on at least one side. No probability tail is truncated.
+      const progress = 1 - firstProfile.miss * secondProfile.miss;
+      const firstWins = new Float64Array(first.maxHp + 1);
+      const secondWins = new Float64Array(second.maxHp + 1);
+      const states = new Float64Array(firstNeeds * secondNeeds);
+      states[0] = 1;
       let avgRounds = 0;
       for (let i = 0; i < firstNeeds; i++) {
-        next.fill(0);
         for (let j = 0; j < secondNeeds; j++) {
-          const mass = row[j];
+          const index = i * secondNeeds + j;
+          const mass = states[index];
           if (!mass) continue;
-          avgRounds += mass / progress;
-          if (i === firstNeeds - 1) {
-            // A lethal first attack prevents the second attack in this round.
-            firstWins[j] += mass * firstHit / progress;
-          } else {
-            next[j] += mass * firstOnly;
-            if (j === secondNeeds - 1) secondWins[i + 1] += mass * bothHit;
-            else next[j + 1] += mass * bothHit;
+          const roundMass = mass / progress;
+          avgRounds += roundMass;
+          const firstHp = first.maxHp - j * secondProfile.unit;
+          const secondHp = second.maxHp - i * firstProfile.unit;
+          for (const firstOutcome of firstProfile.outcomes) {
+            const probability = roundMass * firstOutcome.probability;
+            if (firstOutcome.damage >= secondHp) {
+              firstWins[firstHp] += probability;
+              continue; // Death prevents the opponent's entire turn.
+            }
+            for (const secondOutcome of secondProfile.outcomes) {
+              if (secondOutcome.damage >= firstHp) {
+                secondWins[secondHp - firstOutcome.damage] += probability * secondOutcome.probability;
+              } else if (firstOutcome.damage || secondOutcome.damage) {
+                const nextI = i + firstOutcome.damage / firstProfile.unit;
+                const nextJ = j + secondOutcome.damage / secondProfile.unit;
+                states[nextI * secondNeeds + nextJ] += probability * secondOutcome.probability;
+              }
+            }
           }
-          if (j === secondNeeds - 1) secondWins[i] += mass * secondOnly;
-          else row[j + 1] += mass * secondOnly;
         }
-        [row, next] = [next, row];
       }
-      for (let j = 0; j < firstWins.length; j++) {
-        addOutcome(firstSide, first.maxHp - j * secondDamage, firstWins[j], first, second);
+      for (let hp = 1; hp < firstWins.length; hp++) {
+        addOutcome(firstSide, hp, firstWins[hp], firstSurvival);
       }
-      for (let i = 0; i < secondWins.length; i++) {
-        addOutcome(secondSide, second.maxHp - i * firstDamage, secondWins[i], second, first);
+      for (let hp = 1; hp < secondWins.length; hp++) {
+        addOutcome(secondSide, hp, secondWins[hp], secondSurvival);
       }
       return finish(avgRounds);
     }
 
     // Keep the existing suggestion calculator usable with deterministic results.
     function estimateWinRate(p1, p2) {
+      if (p2.isTreppenboss) return { winRate: 0, avgRounds: calculateTreppenbossCombat(p1, p2).avgRounds };
       const result = calculateExactCombat(p1, p2);
       return { winRate: result.p1WinRate, avgRounds: result.avgRounds };
     }
 
     function updateCalculatedStats() {
-      const ids = ["calculatedDamage1", "calculatedDamage2", "calculatedCriticalDamage1", "calculatedCriticalDamage2", "calculatedDodge1", "calculatedDodge2", "calculatedFirst1", "calculatedFirst2"];
+      const ids = ["calculatedDamage1", "calculatedDamage2", "calculatedCriticalDamage1", "calculatedCriticalDamage2", "calculatedDodge1", "calculatedDodge2", "calculatedDouble1", "calculatedDouble2", "calculatedCriticalChance1", "calculatedCriticalChance2", "calculatedFirst1", "calculatedFirst2"];
       if (!validateFighters([1, 2], false)) {
         for (const id of ids) document.getElementById(id).textContent = "—";
         return;
@@ -641,6 +706,10 @@
       document.getElementById("calculatedCriticalDamage2").textContent = criticalDamage(p2.atk, p1.def, p2.crit);
       document.getElementById("calculatedDodge1").textContent = percent(dodgeChance(p1.eva));
       document.getElementById("calculatedDodge2").textContent = percent(dodgeChance(p2.eva));
+      document.getElementById("calculatedDouble1").textContent = percent(doubleHitChance(p1.spd));
+      document.getElementById("calculatedDouble2").textContent = percent(doubleHitChance(p2.spd));
+      document.getElementById("calculatedCriticalChance1").textContent = percent(criticalHitChance(p1.crit));
+      document.getElementById("calculatedCriticalChance2").textContent = percent(criticalHitChance(p2.crit));
       document.getElementById("calculatedFirst1").textContent = p1.spd >= p2.spd ? "Ja" : "Nein";
       document.getElementById("calculatedFirst2").textContent = p2.spd > p1.spd ? "Ja" : "Nein";
     }
@@ -702,12 +771,12 @@
         ["Verteidigung", p1.def, p2.def],
         ["Ausweichen", p1.eva, p2.eva],
         ["Geschwindigkeit", p1.spd, p2.spd],
-        ["Kritisch (nur Anzeige)", p1.crit, p2.crit],
+        ["Kritisch", p1.crit, p2.crit],
         ["Grundschaden", damage(p1.atk, p2.def), damage(p2.atk, p1.def)],
         ["Schaden Kritisch (Schätzung)", criticalDamage(p1.atk, p2.def, p1.crit), criticalDamage(p2.atk, p1.def, p2.crit)],
         ["Chance Ausweichen", percent(dodgeChance(p1.eva)), percent(dodgeChance(p2.eva))],
-        ["Chance Doppelter Hit (unbekannt)", "N/A", "N/A"],
-        ["Chance Kritischer Hit (unbekannt)", "N/A", "N/A"],
+        ["Chance Doppelter Hit (vorläufig)", percent(doubleHitChance(p1.spd)), percent(doubleHitChance(p2.spd))],
+        ["Chance Kritischer Hit (vorläufig)", percent(criticalHitChance(p1.crit)), percent(criticalHitChance(p2.crit))],
         ["Erster Angriff", p1.spd >= p2.spd ? "Ja" : "Nein", p2.spd > p1.spd ? "Ja" : "Nein"]
       ];
       return `<details class="reserve-explanation calculation-details">
@@ -716,13 +785,16 @@
         <ul class="formula-list">
           <li><strong>HP:</strong> Bestimmt, wie viel Schaden eine Flasche übersteht.</li>
           <li><strong>Angriff und gegnerische Verteidigung:</strong> Bestimmen den Grundschaden pro gelandetem Treffer.</li>
-          <li><strong>Ausweichen:</strong> Bestimmt die Ausweichchance mit der aktuellen, noch nicht optimalen Formel.</li>
-          <li><strong>Geschwindigkeit:</strong> Bestimmt ausschließlich, wer zuerst angreift; bei Gleichstand beginnt der Spieler.</li>
+          <li><strong>Ausweichen:</strong> Bestimmt die Ausweichchance mit einer vorläufigen Formel.</li>
+          <li><strong>Geschwindigkeit:</strong> Bestimmt die Doppeltrefferchance und, wer zuerst angreift; bei Gleichstand beginnt der Spieler.</li>
+          <li><strong>Kritisch:</strong> Bestimmt die kritische Trefferchance und den kritischen Schaden.</li>
         </ul>
-        <p class="muted"><strong>Aktuell nicht in der Kampfberechnung berücksichtigt:</strong></p>
+        <p class="muted"><strong>Ablauf jedes Zuges:</strong></p>
         <ul class="formula-list">
-          <li><strong>Kritisch und kritische Treffer:</strong> Die Trefferchance ist unbekannt. Der geschätzte kritische Schaden wird nur angezeigt und beeinflusst die Ergebnisse nicht.</li>
-          <li><strong>Doppeltreffer:</strong> Die Chance ist unbekannt. Jede Flasche hat höchstens einen Angriff pro Runde; Geschwindigkeit gewährt keine zusätzlichen Angriffe.</li>
+          <li><strong>Erster Angriff:</strong> Zuerst wird Ausweichen gewürfelt. Nur bei einem Treffer folgt ein Kritisch-Wurf für kritischen oder normalen Schaden.</li>
+          <li><strong>Zusatzangriff:</strong> Falls beide Flaschen überleben, folgt auch nach einem ausgewichenen Angriff ein Geschwindigkeitswurf. Bei Erfolg gibt es genau einen weiteren Angriff mit eigenen Ausweich- und Kritisch-Würfen.</li>
+          <li><strong>Danach:</strong> Die andere Flasche ist am Zug. Ein Zusatzangriff löst keinen weiteren Zusatzangriff aus. Bei 0 HP endet der Kampf sofort.</li>
+          <li><strong>Rundenzählung:</strong> Eine Runde beginnt mit der schnelleren Flasche und enthält bis zu einen Zug je Flasche. Ein Zug enthält einen oder zwei Angriffsversuche.</li>
           <li><strong>Eingereichte echte Kämpfe:</strong> Die Daten werden zur späteren Verbesserung gesammelt und ändern die Formeln nicht automatisch.</li>
         </ul>
         <p class="muted">Werte zum Zeitpunkt dieser Berechnung:</p>
@@ -732,28 +804,27 @@
         </table></div>
         <ul class="formula-list">
           <li><strong>Schaden:</strong> round(Angriff × 15 / (15 + gegnerische Verteidigung))</li>
-          <li><strong>Schaden Kritisch (nur Anzeige):</strong> round(Grundschaden × (2 + Kritisch / 100)). Aktuelle beste Schätzung, noch unbestätigt.</li>
-          <li><strong>Chance Ausweichen:</strong> Ausweichen / (Ausweichen + 270)</li>
-          <li><strong>Trefferchance:</strong> 270 / (Ausweichen des Verteidigers + 270)</li>
-          <li><strong>Erster Angriff:</strong> Höhere Geschwindigkeit beginnt; bei Gleichstand Spieler. Eine Attacke je Flasche und Runde.</li>
-          <li><strong>Reserve nach Sieg:</strong> ceil(Rest-HP / gegnerischer Schaden) / gegnerische Trefferchance − 1.
+          <li><strong>Schaden Kritisch:</strong> round(Grundschaden × (2 + Kritisch / 100)). Vorläufige Schätzung.</li>
+          <li><strong>Doppeltrefferchance:</strong> Geschwindigkeit / (Geschwindigkeit + 160). Vorläufige Schätzung.</li>
+          <li><strong>Kritische Trefferchance:</strong> Kritisch / (Kritisch + 100). Vorläufige Schätzung.</li>
+          <li><strong>Chance Ausweichen:</strong> Ausweichen / (Ausweichen + 100)</li>
+          <li><strong>Trefferchance:</strong> 100 / (Ausweichen des Verteidigers + 100)</li>
+          <li><strong>Erster Angriff:</strong> Höhere Geschwindigkeit beginnt; bei Gleichstand Spieler.</li>
+          <li><strong>Reserve nach Sieg:</strong> Erwartete weitere gegnerische Züge bis zur Niederlage − 1, berechnet aus der Rest-HP-Verteilung einschließlich kritischer Treffer und Zusatzangriffe.
             Bei 0 gegnerischem Schaden ist die Reserve unbegrenzt (∞).</li>
         </ul>
-        <p class="muted">Die Gewinnwahrscheinlichkeiten ergeben sich direkt aus allen möglichen Treffer- und Ausweichfolgen,
-          ohne Zufallssimulation und ohne Rundenlimit. Kritische Treffer und Doppeltreffer sind noch nicht enthalten.</p>
-        <p class="muted">Die Reserve ist die erwartete Zahl weiterer überstandener gegnerischer Angriffe nach einem Sieg;
-          der tödliche Angriff zählt nicht mit. Mittelwert und 90%-Reserve gelten nur für die Siege der jeweiligen Seite.
+        <p class="muted">Die Gewinnwahrscheinlichkeiten ergeben sich direkt aus allen möglichen Treffer-, Ausweich-, Kritisch- und Zusatzangriffsfolgen,
+          ohne Zufallssimulation und ohne Rundenlimit. Alle Formeln sind vorläufig.</p>
+        <p class="muted">Die Reserve ist die erwartete Zahl weiterer vollständig überstandener gegnerischer Züge nach einem Sieg;
+          der tödliche Zug zählt nicht mit. Mittelwert und 90%-Reserve gelten nur für die Siege der jeweiligen Seite.
           Die Balkenhöhen zeigen die unbedingten Wahrscheinlichkeiten; pro Seite summieren sie sich zur Gewinnchance.
           Alle Ergebnisse gelten unter den aktuell verwendeten Kampfformeln.</p>
       </details>`;
     }
 
     function expectedExtraRounds(remainingHp, winner, opponent) {
-      const incomingDamage = damage(opponent.atk, winner.def);
-      if (incomingDamage === 0) return Infinity;
-      const hitsUntilDefeat = Math.ceil(remainingHp / incomingDamage);
-      const hitProbability = 270 / (winner.eva + 270);
-      return Math.max(0, hitsUntilDefeat / hitProbability - 1);
+      const incoming = combatTurnProfile(opponent, winner);
+      return Math.max(0, survivalTurnExpectations(remainingHp, incoming)[remainingHp] - 1);
     }
 
     function formatReserve(value, digits = 1) {
@@ -866,6 +937,7 @@
           </div>` : ""}
         </div>
         <div class="outcome-cards">${outcomeCard("p1", "Spieler", player, playerRate, enemyRate)}${outcomeCard("p2", "Gegner", enemy, enemyRate, playerRate)}</div>
+        <p class="muted">Ø Kampfdauer: ${formatReserve(lastCalculation.avgRounds)} Runden. Ausweichen, kritische Treffer und Zusatzangriffe sind berücksichtigt.</p>
         <p class="muted">Je weiter ein Balken von 0 entfernt ist, desto größer die Reserve nach dem Sieg.</p>
         ${bins.length ? `<div class="histogram-legend"><span><span class="legend-dot" style="background:#c5534c"></span>Gegner-Siege (links)</span><span><span class="legend-dot" style="background:#37805a"></span>Spieler-Siege (rechts)</span></div>${histogramHtml(bins, Math.max(280, Math.min(760, panel.clientWidth || 760)))}` : ""}
         ${infinitePlayer || infiniteEnemy ? `<p class="muted">Unbegrenzte Reserve (∞): Spieler ${percent(infinitePlayer)}, Gegner ${percent(infiniteEnemy)} Wahrscheinlichkeit. Der jeweilige Gegner verursacht 0 Schaden; diese Siege sind nicht als Balken dargestellt.</p>` : ""}
