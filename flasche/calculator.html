@@ -87,6 +87,22 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
+    .fight-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 16px; align-items: start; }
+    .fight-tools { min-width: 0; margin-top: 16px; position: sticky; top: 16px; }
+    .fight-tools > details > summary { cursor: pointer; font-size: 15px; font-weight: 600; }
+    .fight-tools h3 { font-size: 14px; margin: 18px 0 8px; }
+    .fight-tools p { font-size: 13px; line-height: 1.45; }
+    .fight-tools input { font: inherit; border: 1px solid #d5d5d5; border-radius: 6px; }
+    .fight-tools button { padding: 8px 10px; font-size: 13px; }
+    .fight-tools .optimizer-toggle { background: #edf1ee; color: #444; }
+    .fight-tools .optimizer-toggle[aria-pressed="true"] { background: #267047; color: white; }
+    .fight-tools .optimizer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .fight-tools .optimizer-result { margin-top: 10px; }
+    .fight-tools .optimizer-result:empty { display: none; }
+    .fight-tools .compact-table { font-size: 12px; }
+    .fight-tools .compact-table tbody th { font-weight: 500; }
+    @media (max-width: 980px) { .fight-workspace { grid-template-columns: 1fr; } .fight-tools { position: static; margin-top: 0; } }
+
     .winner {
       font-weight: bold;
       font-size: 20px;
@@ -369,7 +385,31 @@
 
 
 
-  <div id="result"></div>
+  <div class="fight-workspace">
+    <div id="result"></div>
+    <aside class="fight-tools" aria-label="Statpunkte optimieren">
+      <details id="statOptimizer" class="card">
+        <summary>Punkte optimieren</summary>
+        <p class="stat-note">Zusätzliche Punkte ab den aktuellen Spielerwerten. Jeder Punkt erhöht einen Attributwert um 1; kein Wert wird gesenkt.</p>
+        <h3 id="nextPointTitle">Bester nächster Punkt</h3>
+        <div id="nextPointResult" class="optimizer-result" aria-live="polite"></div>
+        <h3 id="minimumTargetTitle">Siegziel erreichen</h3>
+        <label id="winTargetField">Gewünschte Gewinnchance (%)
+          <input id="targetWinRate" type="number" value="96" min="0.1" max="100" step="0.1">
+        </label>
+        <label id="bossTargetField" hidden>Gewünschter Ø Gesamtschaden
+          <input id="targetBossDamage" type="number" value="150" min="0" step="any">
+        </label>
+        <button id="includeHealthButton" type="button" class="optimizer-toggle" aria-pressed="false">HP einbeziehen: Nein</button>
+        <div class="optimizer-actions">
+          <button id="findMinimumStats" type="button">Minimalpunkte berechnen</button>
+          <button id="cancelOptimization" type="button" class="optimizer-toggle" hidden>Abbrechen</button>
+        </div>
+        <p id="minimumSearchStatus" class="stat-note" role="status" aria-live="polite"></p>
+        <div id="minimumResult" class="optimizer-result" aria-live="polite"></div>
+      </details>
+    </aside>
+  </div>
 
   <section id="realFight" class="card" aria-labelledby="realFightTitle" tabindex="-1">
     <h2 id="realFightTitle">Echter Kampf</h2>
@@ -680,6 +720,13 @@
       for (let start = 0; start < upper; start += width) bins.push({ start, end: Math.min(start + width, upper), probability: 0, tail: false });
       for (const outcome of distribution.outcomes) bins[Math.floor(outcome.damage / width)].probability += outcome.probability;
       if (distribution.tailFrom !== null) bins.push({ start: distribution.tailFrom, end: Infinity, probability: distribution.tailProbability, tail: true });
+      // Combine the far-right ranges while their total is at most 5%.
+      let tailStart = bins.length, tailProbability = 0;
+      while (tailStart > 0 && tailProbability + bins[tailStart - 1].probability <= .05 + 1e-12) {
+        tailProbability += bins[--tailStart].probability;
+      }
+      if (bins.length - tailStart > 1) bins.splice(tailStart, bins.length - tailStart,
+        { start: bins[tailStart].start, end: Infinity, probability: tailProbability, tail: true });
       return bins;
     }
 
@@ -709,7 +756,8 @@
         }
       });
       content += `<text x="${left + plotWidth / 2}" y="285" text-anchor="middle" font-size="13" fill="#444">Gesamtschaden am Treppenboss</text>`;
-      const tailNote = distribution.tailFrom === null ? "" : `<p class="stat-note">Der letzte Balken fasst alle Schäden ab ${distribution.tailFrom.toLocaleString("de-DE")} zusammen: ${distribution.tailProbability < .0001 ? "unter 0,01%" : percent(distribution.tailProbability)}.</p>`;
+      const lastBin = bins[bins.length - 1];
+      const tailNote = !lastBin.tail ? "" : `<p class="stat-note">Der letzte Balken fasst alle Schäden ab ${lastBin.start.toLocaleString("de-DE")} zusammen: ${lastBin.probability < .0001 ? "unter 0,01%" : percent(lastBin.probability)}.</p>`;
       return `<h3>Verteilung des Gesamtschadens</h3><p class="muted">Die Balkenhöhe zeigt die Wahrscheinlichkeit des jeweiligen Schadensbereichs.</p><div class="histogram-scroll"><svg class="survival-histogram" viewBox="0 0 ${chartWidth} 310" role="img" aria-labelledby="bossDamageChartTitle bossDamageChartDescription" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">${content}</svg></div>${tailNote}`;
     }
 
@@ -738,8 +786,7 @@
     }
 
     function treppenbossResultHtml(player, boss, result) {
-      return `${calculationHeaderHtml("Berechnung abgeschlossen")}
-        <section aria-label="Erwarteter Schaden gegen den Treppenboss">
+      return `<section aria-label="Erwarteter Schaden gegen den Treppenboss">
           <h3>Schaden gegen den Treppenboss</h3>
           <p class="muted">Der Gegner hat unendlich HP. Berechnet wird dein gesamter Schaden bis zur Niederlage.</p>
           <div class="outcome-card"><div class="win-chance">${formatReserve(result.avgDamage)}</div>
@@ -873,7 +920,7 @@
       return finish(avgRounds);
     }
 
-    // Keep the existing suggestion calculator usable with deterministic results.
+    // Shared summary for callers that need only win chance and duration.
     function estimateWinRate(p1, p2) {
       if (p2.isTreppenboss) return { winRate: 0, avgRounds: calculateTreppenbossCombat(p1, p2, false).avgRounds };
       const result = calculateExactCombat(p1, p2);
@@ -946,10 +993,9 @@
       }
       updateCalculatedStats();
       panel.innerHTML = `
-        ${calculationHeaderHtml("Berechnung abgeschlossen")}
-        ${calculationDetailsHtml(p1, p2)}
         <section aria-label="Siegchancen und Überlebensreserve"><div id="survivalDistribution"></div></section>
         ${combatStatisticsHtml(lastCalculation.combatStats)}
+        ${calculationDetailsHtml(p1, p2)}
       `;
       renderSurvivalDistribution();
       if (detailsOpen) panel.querySelector(".calculation-details").open = true;
@@ -1138,178 +1184,396 @@
       `;
     }
 
-    function scoreBottle(p) {
-      // Grober Minimalitäts-Score.
-      // HP ist meist größer skaliert, daher zählt 10 HP ungefähr wie 1 Statpunkt.
-      return p.atk + p.def + p.eva + p.spd + p.maxHp / 10;
+    function upgradeFighter(player, keys, increments) {
+      const upgraded = { ...player };
+      keys.forEach((key, i) => {
+        upgraded[key] = (key === "hp" ? player.maxHp : player[key]) + increments[i];
+        if (key === "hp") upgraded.maxHp = upgraded.hp;
+      });
+      return upgraded;
     }
 
-    function bottleToHtml(title, p, stats, idPrefix) {
-      return `
-        <div class="suggestion">
-          <strong>${title}</strong><br>
-          HP: ${p.maxHp}<br>
-          Angriff: ${p.atk}<br>
-          Verteidigung: ${p.def}<br>
-          Ausweichen: ${p.eva}<br>
-          Geschwindigkeit: ${p.spd}<br>
-          Kritisch: ${p.crit}<br>
-          Gewinnchance: ${percent(stats.winRate)}<br>
-          Ø Runden: ${stats.avgRounds.toFixed(2)}<br>
-          Score: ${scoreBottle(p).toFixed(1)}<br>
-          <button onclick="applySuggestion('${idPrefix}')">Übernehmen</button>
-        </div>
-      `;
+    function guaranteedPlayerWin(player, enemy, own, incoming) {
+      if (!own.unit) return false;
+      if (!incoming.unit) return true;
+      if (own.miss > 0) return false;
+      const minimumDamage = own.outcomes[0].damage;
+      const ownTurns = Math.ceil(enemy.maxHp / minimumDamage);
+      const enemyTurns = ownTurns - (player.spd >= enemy.spd ? 1 : 0);
+      const maximumIncoming = incoming.outcomes[incoming.outcomes.length - 1].damage;
+      return enemyTurns * maximumIncoming < player.maxHp;
     }
 
-    const savedSuggestions = {};
-
-    function applySuggestion(id) {
-      const p = savedSuggestions[id];
-      if (!p) return;
-
-      setNumber("hp1", p.maxHp);
-      setNumber("atk1", p.atk);
-      setNumber("def1", p.def);
-      setNumber("eva1", p.eva);
-      setNumber("spd1", p.spd);
-      setNumber("crit1", p.crit);
-      fighterValuesChanged();
-
-      const { p1, p2 } = readFighters();
-      updateCalculatedStats();
+    function combatVictoryProbability(player, enemy) {
+      const own = combatTurnProfile(player, enemy), incoming = combatTurnProfile(enemy, player);
+      if (!own.unit) return 0;
+      if (guaranteedPlayerWin(player, enemy, own, incoming)) return 1;
+      const playerFirst = player.spd >= enemy.spd;
+      const first = playerFirst ? player : enemy, second = playerFirst ? enemy : player;
+      const a = playerFirst ? own : incoming, b = playerFirst ? incoming : own;
+      const rows = Math.ceil(second.maxHp / a.unit), columns = Math.ceil(first.maxHp / b.unit);
+      if (rows * columns > 4000000) throw new RangeError("Diese Werte benötigen zu viele Zustände für die Optimierung.");
+      const values = new Float64Array(rows * columns);
+      const progress = 1 - a.miss * b.miss;
+      for (let i = rows - 1; i >= 0; i--) for (let j = columns - 1; j >= 0; j--) {
+        const hpFirst = first.maxHp - j * b.unit, hpSecond = second.maxHp - i * a.unit;
+        let chance = 0;
+        for (const x of a.outcomes) {
+          if (x.damage >= hpSecond) { chance += x.probability; continue; }
+          for (const y of b.outcomes) {
+            if (y.damage < hpFirst && (x.damage || y.damage)) chance += x.probability * y.probability
+              * values[(i + x.damage / a.unit) * columns + j + y.damage / b.unit];
+          }
+        }
+        values[i * columns + j] = chance / progress;
+      }
+      // A displayed 100.00% may still have a tiny loss chance. Reserve exact
+      // 100% targets for structurally guaranteed victories, not roundoff.
+      return Math.max(0, Math.min(1 - Number.EPSILON, playerFirst ? values[0] : 1 - values[0]));
     }
 
-    function calculateSuggestions() {
-      if (!validateFighters()) return;
-      const { p1, p2 } = readFighters();
+    function optimizationScore(player, enemy) {
+      return enemy.isTreppenboss ? calculateTreppenbossCombat(player, enemy, false).avgDamage
+        : combatVictoryProbability(player, enemy);
+    }
 
-      const targetInput = document.getElementById("targetWinRate");
-      const simsInput = document.getElementById("suggestionSims");
-      if ([targetInput, simsInput].some(input => input && !input.reportValidity())) return;
-      const target = Math.max(0.01, Math.min(1, Number(targetInput ? targetInput.value : 80) / 100));
-      const sims = Math.max(100, Math.floor(Number(simsInput ? simsInput.value : 1000)));
+    function targetReached(score, target) {
+      return score >= target;
+    }
 
-      const base = {
-        name: "Spieler",
-        hp: p1.maxHp,
-        maxHp: p1.maxHp,
-        atk: p1.atk,
-        def: p1.def,
-        eva: p1.eva,
-        spd: Math.max(p1.spd, p2.spd + 1),
-        crit: p1.crit
+    function bestNextStatPoint(player, enemy) {
+      const baseline = optimizationScore(player, enemy);
+      const options = [];
+      for (const stat of ["atk", "def", "eva", "crit", "spd"]) {
+        if (player[stat] >= 999) continue;
+        const upgraded = upgradeFighter(player, [stat], [1]);
+        const score = optimizationScore(upgraded, enemy);
+        const gain = baseline === Infinity ? 0 : score === Infinity ? Infinity : score - baseline;
+        options.push({ stat, player: upgraded, score, gain });
+      }
+      options.sort((a, b) => b.gain - a.gain);
+      const bestGain = options[0]?.gain || 0;
+      const best = bestGain > 1e-12 ? options.filter(option => option.gain === bestGain || Math.abs(option.gain - bestGain) < 1e-12) : [];
+      return { baseline, options, best };
+    }
+
+    function minimumStatPoints(player, enemy, target, includeHealth = false, onProgress = () => {}) {
+      if (!Number.isFinite(target) || target < 0 || (!enemy.isTreppenboss && target > 1)) throw new RangeError("Ungültiges Ziel.");
+      const keys = ["atk", "def", "eva", "crit", "spd", ...(includeHealth ? ["hp"] : [])];
+      const caps = keys.map(key => 999 - (key === "hp" ? player.maxHp : player[key]));
+      if (caps.some(cap => !Number.isInteger(cap) || cap < 0)) throw new RangeError("Spielerwerte müssen zwischen 0 und 999 liegen.");
+      const cache = new Map();
+      let evaluations = 0, best = null, lastProgress = 0, lowerBound = 0;
+      const sum = vector => vector.reduce((a, b) => a + b, 0);
+      const evaluate = increments => {
+        const key = increments.join(",");
+        if (cache.has(key)) return cache.get(key);
+        const score = optimizationScore(upgradeFighter(player, keys, increments), enemy);
+        evaluations++;
+        if (cache.size < 50000) cache.set(key, score);
+        if (Date.now() - lastProgress > 250) {
+          lastProgress = Date.now();
+          onProgress({ evaluations, lowerBound, best });
+        }
+        return score;
       };
+      const remember = increments => {
+        const cost = sum(increments), score = evaluate(increments);
+        if (targetReached(score, target) && (!best || cost < best.points)) {
+          best = { points: cost, score, increments: increments.slice(), player: upgradeFighter(player, keys, increments) };
+        }
+      };
+      const zero = keys.map(() => 0), baseline = evaluate(zero);
+      if (targetReached(baseline, target)) {
+        remember(zero);
+        return { status: "optimal", ...best, keys, evaluations, baseline };
+      }
+      if (!targetReached(evaluate(caps), target)) return { status: "unreachable", keys, evaluations, baseline };
 
-      const suggestions = [];
-
-      // Angriff-Build:
-      // HP/Def/Ausweichen bleiben wie bei Spieler, Geschwindigkeit wird so gesetzt,
-      // dass man anfängt, Angriff wird erhöht.
-      let bestAttack = null;
-      for (let atk = Math.max(1, base.atk); atk <= 1000; atk++) {
-        const candidate = {
-          ...base,
-          atk,
-          hp: base.maxHp,
-          maxHp: base.maxHp
-        };
-
-        const stats = estimateWinRate(candidate, p2, sims);
-
-        if (stats.winRate >= target) {
-          bestAttack = { p: candidate, stats };
-          break;
+      // Obtain a feasible upper bound, first from each single attribute, then
+      // by removing unnecessary points from coordinate-wise maximum builds.
+      for (let i = 0; i < keys.length; i++) {
+        const candidate = zero.slice();
+        candidate[i] = caps[i];
+        if (!caps[i] || !targetReached(evaluate(candidate), target)) continue;
+        let lo = 1, hi = caps[i];
+        while (lo < hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          candidate[i] = mid;
+          if (targetReached(evaluate(candidate), target)) hi = mid; else lo = mid + 1;
+        }
+        candidate[i] = lo;
+        remember(candidate);
+      }
+      if (!best) {
+        for (const order of [keys.map((_, i) => i), keys.map((_, i) => keys.length - 1 - i)]) {
+          const candidate = caps.slice();
+          for (const i of order) {
+            let lo = 0, hi = candidate[i];
+            while (lo < hi) {
+              const mid = Math.floor((lo + hi) / 2);
+              candidate[i] = mid;
+              if (targetReached(evaluate(candidate), target)) hi = mid; else lo = mid + 1;
+            }
+            candidate[i] = lo;
+          }
+          remember(candidate);
         }
       }
 
-      if (bestAttack) {
-        suggestions.push({
-          id: "attack",
-          title: "Angriff-Flasche",
-          p: bestAttack.p,
-          stats: bestAttack.stats
-        });
-      }
-
-      // Defense-Build:
-      // HP/Angriff/Ausweichen bleiben wie bei Spieler, Geschwindigkeit wird so gesetzt,
-      // dass man anfängt, Verteidigung wird erhöht.
-      let bestDefense = null;
-      for (let def = Math.max(0, base.def); def <= 1000; def++) {
-        const candidate = {
-          ...base,
-          def,
-          hp: base.maxHp,
-          maxHp: base.maxHp
-        };
-
-        const stats = estimateWinRate(candidate, p2, sims);
-
-        if (stats.winRate >= target) {
-          bestDefense = { p: candidate, stats };
-          break;
+      // Every box contains integer allocations. Coordinate-wise upper corners
+      // bound every allocation in the box because all six stats are monotone.
+      // The optimistic radius below gives a lower bound on its required cost.
+      // Searching all boxes cheaper than the incumbent certifies the minimum.
+      const bound = (lo, hi) => {
+        const baseCost = sum(lo), budget = best.points - 1 - baseCost;
+        if (budget < 0) return null;
+        hi = hi.map((value, i) => Math.min(value, lo[i] + budget));
+        if (hi.some((value, i) => value < lo[i]) || !targetReached(evaluate(hi), target)) return null;
+        if (targetReached(evaluate(lo), target)) { remember(lo); return null; }
+        let left = 1, right = Math.min(budget, Math.max(...hi.map((value, i) => value - lo[i])));
+        if (right < 1) return null;
+        while (left < right) {
+          const mid = Math.floor((left + right) / 2);
+          const optimistic = hi.map((value, i) => Math.min(value, lo[i] + mid));
+          if (targetReached(evaluate(optimistic), target)) right = mid; else left = mid + 1;
         }
-      }
-
-      if (bestDefense) {
-        suggestions.push({
-          id: "defense",
-          title: "Defense-Flasche",
-          p: bestDefense.p,
-          stats: bestDefense.stats
-        });
-      }
-
-      // Balanced-Build:
-      // Erhöht HP, Angriff und Verteidigung gemeinsam.
-      // HP steigt in 5er-Schritten, Angriff und Defense in 1er-Schritten.
-      let bestBalanced = null;
-      for (let s = 0; s <= 1000; s++) {
-        const candidate = {
-          ...base,
-          maxHp: base.maxHp + 5 * s,
-          hp: base.maxHp + 5 * s,
-          atk: base.atk + s,
-          def: base.def + s
-        };
-
-        const stats = estimateWinRate(candidate, p2, sims);
-
-        if (stats.winRate >= target) {
-          bestBalanced = { p: candidate, stats };
-          break;
+        const minimum = baseCost + left;
+        return minimum < best.points ? { lo, hi, minimum } : null;
+      };
+      const heap = [];
+      const push = box => {
+        if (!box) return;
+        let index = heap.length;
+        heap.push(box);
+        while (index > 0) {
+          const parent = (index - 1) >> 1;
+          if (heap[parent].minimum <= box.minimum) break;
+          heap[index] = heap[parent]; index = parent;
         }
-      }
-
-      if (bestBalanced) {
-        suggestions.push({
-          id: "balanced",
-          title: "Balanced-Flasche",
-          p: bestBalanced.p,
-          stats: bestBalanced.stats
-        });
-      }
-
-      let html = "";
-
-      if (suggestions.length === 0) {
-        html = `
-          <p>
-            Keine passende Flasche gefunden.
-            Erhöhe ggf. die aktuellen Grundwerte von Spieler oder senke die Ziel-Gewinnchance.
-          </p>
-        `;
-      } else {
-        for (const s of suggestions) {
-          savedSuggestions[s.id] = s.p;
-          html += bottleToHtml(s.title, s.p, s.stats, s.id);
+        heap[index] = box;
+      };
+      const pop = () => {
+        const box = heap[0], last = heap.pop();
+        if (heap.length) {
+          let index = 0;
+          while (2 * index + 1 < heap.length) {
+            let child = 2 * index + 1;
+            if (child + 1 < heap.length && heap[child + 1].minimum < heap[child].minimum) child++;
+            if (last.minimum <= heap[child].minimum) break;
+            heap[index] = heap[child]; index = child;
+          }
+          heap[index] = last;
         }
+        return box;
+      };
+      push(bound(zero, caps));
+      while (heap.length) {
+        const box = pop();
+        if (box.minimum >= best.points) continue;
+        lowerBound = box.minimum;
+        const current = bound(box.lo, box.hi);
+        if (!current) continue;
+        let dimension = 0;
+        for (let i = 1; i < keys.length; i++) if (current.hi[i] - current.lo[i] > current.hi[dimension] - current.lo[dimension]) dimension = i;
+        const mid = Math.floor((current.lo[dimension] + current.hi[dimension]) / 2);
+        const lowHi = current.hi.slice(), highLo = current.lo.slice();
+        lowHi[dimension] = mid; highLo[dimension] = mid + 1;
+        push(bound(current.lo.slice(), lowHi));
+        push(bound(highLo, current.hi.slice()));
       }
-
-      const suggestionOutput = document.getElementById("suggestions");
-      if (suggestionOutput) suggestionOutput.innerHTML = html;
+      return { status: "optimal", ...best, keys, evaluations, baseline };
     }
+
+
+    const optimizerStatLabels = { atk: "Angriff", def: "Verteidigung", eva: "Ausweichen", crit: "Kritisch", spd: "Geschwindigkeit", hp: "HP" };
+    let optimizationRevision = 0, nextPointWorker = null, minimumWorker = null, nextPointTimer;
+    let nextPointSuggestion = null, minimumSuggestion = null;
+
+    function optimizationWorker() {
+      const functions = [damage, criticalDamage, dodgeChance, doubleHitChance, criticalHitChance,
+        combatTurnProfile, expectedTurnAttempts, survivalTurnExpectations, combatStatistics, calculateTreppenbossCombat,
+        upgradeFighter, guaranteedPlayerWin, combatVictoryProbability, optimizationScore, targetReached, bestNextStatPoint, minimumStatPoints];
+      const source = functions.map(fn => fn.toString()).join("\n") + `
+        self.onmessage = event => {
+          const job = event.data;
+          try {
+            if (job.kind === "next") self.postMessage({ type: "result", result: bestNextStatPoint(job.player, job.enemy) });
+            else {
+              const result = minimumStatPoints(job.player, job.enemy, job.target, job.includeHealth,
+                progress => self.postMessage({ type: "progress", ...progress }));
+              self.postMessage({ type: "result", result });
+            }
+          } catch (error) { self.postMessage({ type: "error", message: error.message }); }
+        };`;
+      const url = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+      let worker;
+      try { worker = new Worker(url); }
+      catch (error) { URL.revokeObjectURL(url); throw error; }
+      const terminate = worker.terminate.bind(worker);
+      worker.terminate = () => { terminate(); URL.revokeObjectURL(url); };
+      return worker;
+    }
+
+    function optimizerScoreLabel(score, boss) {
+      return boss ? `${formatReserve(score)} Schaden` : percent(score);
+    }
+
+    function applyOptimizerPlayer(player) {
+      for (const stat of statKeys) setNumber(stat + "1", stat === "hp" ? player.maxHp : player[stat]);
+      fighterValuesChanged();
+    }
+
+    function applyNextPoint() {
+      if (nextPointSuggestion?.revision === optimizationRevision) applyOptimizerPlayer(nextPointSuggestion.player);
+    }
+
+    function applyMinimumPoints() {
+      if (minimumSuggestion?.revision === optimizationRevision) applyOptimizerPlayer(minimumSuggestion.player);
+    }
+
+    function refreshOptimizerMode() {
+      const boss = document.getElementById("enemyTreppenboss").checked;
+      document.getElementById("winTargetField").hidden = boss;
+      document.getElementById("bossTargetField").hidden = !boss;
+      document.getElementById("minimumTargetTitle").textContent = boss ? "Schadensziel erreichen" : "Siegziel erreichen";
+      document.getElementById("nextPointTitle").textContent = boss ? "Nächster Punkt: mehr Schaden" : "Nächster Punkt: höhere Gewinnchance";
+    }
+
+    function requestNextPoint() {
+      clearTimeout(nextPointTimer);
+      if (nextPointWorker) { nextPointWorker.terminate(); nextPointWorker = null; }
+      if (!document.getElementById("statOptimizer").open) return;
+      const output = document.getElementById("nextPointResult");
+      if (!validateFighters([1, 2], false)) { output.textContent = "Bitte gültige Flaschenwerte eintragen."; return; }
+      output.textContent = "Vergleiche die fünf Attribute …";
+      const revision = optimizationRevision;
+      nextPointTimer = setTimeout(() => {
+        const { p1, p2 } = readFighters();
+        let worker;
+        try { worker = optimizationWorker(); } catch (error) { output.textContent = "Der Browser konnte die Optimierung nicht starten."; return; }
+        nextPointWorker = worker;
+        const fail = message => {
+          if (nextPointWorker !== worker) return;
+          worker.terminate(); nextPointWorker = null; output.textContent = message;
+        };
+        worker.onerror = () => fail("Der Vergleich konnte nicht berechnet werden.");
+        worker.onmessage = event => {
+          if (nextPointWorker !== worker || revision !== optimizationRevision) return;
+          if (event.data.type === "error") { fail(event.data.message); return; }
+          const result = event.data.result, boss = p2.isTreppenboss;
+          worker.terminate(); nextPointWorker = null;
+          const score = value => optimizerScoreLabel(value, boss);
+          let recommendation;
+          if (result.baseline === Infinity) recommendation = "Der erwartete Schaden ist bereits unbegrenzt.";
+          else if (!boss && result.baseline === 1) recommendation = "Die Gewinnchance beträgt bereits 100%.";
+          else if (!result.options.length) recommendation = "Alle fünf Attribute stehen bereits bei 999.";
+          else if (!result.best.length) recommendation = "Ein einzelner Punkt erhöht den Wert aktuell nicht. Mehrere Punkte können trotzdem helfen.";
+          else {
+            const best = result.best[0];
+            nextPointSuggestion = { player: best.player, revision };
+            const gain = boss ? `${formatReserve(best.gain, best.gain < .1 ? 3 : 1)} Schaden`
+              : `${formatReserve(100 * best.gain, best.gain < .0001 ? 4 : 2)} Prozentpunkte`;
+            recommendation = `<strong>${optimizerStatLabels[best.stat]} +1</strong><br>${score(result.baseline)} → ${score(best.score)}<br>+${gain}`;
+            if (result.best.length > 1) recommendation += `<br><span class="stat-note">Gleichauf: ${result.best.map(option => optimizerStatLabels[option.stat]).join(", ")}.</span>`;
+            recommendation += '<br><button type="button" onclick="applyNextPoint()">Diesen Punkt übernehmen</button>';
+          }
+          output.innerHTML = `<p>${recommendation}</p>${result.options.length ? `<details class="reserve-explanation"><summary>Alle Attribute vergleichen</summary>
+            <table class="compact-table"><thead><tr><th>+1 Punkt</th><th>${boss ? "Ø Schaden" : "Gewinnchance"}</th></tr></thead>
+            <tbody>${result.options.map(option => `<tr><th scope="row">${optimizerStatLabels[option.stat]}</th><td>${score(option.score)}</td></tr>`).join("")}</tbody></table></details>` : ""}`;
+        };
+        worker.postMessage({ kind: "next", player: p1, enemy: p2 });
+      }, 80);
+    }
+
+    function stopMinimumSearch(message = "Suche abgebrochen.") {
+      if (minimumWorker) { minimumWorker.terminate(); minimumWorker = null; }
+      minimumSuggestion = null;
+      document.getElementById("findMinimumStats").disabled = false;
+      document.getElementById("cancelOptimization").hidden = true;
+      document.getElementById("minimumSearchStatus").textContent = message;
+    }
+
+    function minimumAllocationHtml(result, boss, proven) {
+      const changes = result.keys.map((key, i) => result.increments[i] ? `${optimizerStatLabels[key]} +${result.increments[i]}` : "").filter(Boolean);
+      return `<p><strong>${proven ? "Minimum" : "Bisher gefunden"}: ${result.points} zusätzliche Punkte</strong><br>
+        ${optimizerScoreLabel(result.score, boss)}${changes.length ? `<br>${changes.join(" · ")}` : ""}</p>
+        ${proven && result.points > 0 ? '<button type="button" onclick="applyMinimumPoints()">Verteilung übernehmen</button>' : ""}`;
+    }
+
+    function startMinimumSearch() {
+      if (!validateFighters([1, 2], true)) return;
+      const { p1, p2 } = readFighters();
+      const input = document.getElementById(p2.isTreppenboss ? "targetBossDamage" : "targetWinRate");
+      if (!input.reportValidity() || input.value.trim() === "") return;
+      stopMinimumSearch("");
+      const output = document.getElementById("minimumResult"), status = document.getElementById("minimumSearchStatus");
+      output.textContent = "";
+      const includeHealth = document.getElementById("includeHealthButton").getAttribute("aria-pressed") === "true";
+      const keys = ["atk", "def", "eva", "crit", "spd", ...(includeHealth ? ["hp"] : [])];
+      const revision = optimizationRevision;
+      let worker;
+      try { worker = optimizationWorker(); } catch (error) { status.textContent = "Der Browser konnte die Suche nicht starten."; return; }
+      minimumWorker = worker;
+      document.getElementById("findMinimumStats").disabled = true;
+      document.getElementById("cancelOptimization").hidden = false;
+      status.textContent = "Suche nach der kleinsten Anzahl zusätzlicher Punkte …";
+      const fail = message => { if (minimumWorker === worker) stopMinimumSearch(message); };
+      worker.onerror = () => fail("Die Suche konnte nicht abgeschlossen werden.");
+      worker.onmessage = event => {
+        if (minimumWorker !== worker || revision !== optimizationRevision) return;
+        const message = event.data;
+        if (message.type === "error") { fail(message.message); return; }
+        if (message.type === "progress") {
+          status.textContent = message.best ? "Passende Verteilung gefunden. Prüfe, ob es mit weniger Punkten geht …" : "Suche nach einer passenden Verteilung …";
+          if (message.best) output.innerHTML = minimumAllocationHtml({ ...message.best, keys }, p2.isTreppenboss, false);
+          return;
+        }
+        const result = message.result;
+        worker.terminate(); minimumWorker = null;
+        document.getElementById("findMinimumStats").disabled = false;
+        document.getElementById("cancelOptimization").hidden = true;
+        if (result.status === "unreachable") {
+          status.textContent = "Dieses Ziel ist mit den freigegebenen Attributen bis jeweils 999 nicht erreichbar.";
+          output.textContent = "";
+        } else {
+          minimumSuggestion = { player: result.player, revision };
+          status.textContent = result.points === 0 ? "Das Ziel ist bereits erreicht." : "Minimum nachgewiesen: Weniger zusätzliche Punkte reichen nicht.";
+          output.innerHTML = minimumAllocationHtml(result, p2.isTreppenboss, true);
+        }
+      };
+      worker.postMessage({ kind: "minimum", player: p1, enemy: p2, includeHealth,
+        target: Number(input.value) / (p2.isTreppenboss ? 1 : 100) });
+    }
+
+    function invalidateStatOptimizer() {
+      optimizationRevision++;
+      nextPointSuggestion = null;
+      stopMinimumSearch("");
+      document.getElementById("minimumResult").textContent = "";
+      document.getElementById("nextPointResult").textContent = "";
+      refreshOptimizerMode();
+      requestNextPoint();
+    }
+
+    document.getElementById("statOptimizer").addEventListener("toggle", () => {
+      refreshOptimizerMode();
+      if (document.getElementById("statOptimizer").open) requestNextPoint();
+    });
+    document.getElementById("findMinimumStats").addEventListener("click", startMinimumSearch);
+    document.getElementById("cancelOptimization").addEventListener("click", () => stopMinimumSearch());
+    document.getElementById("includeHealthButton").addEventListener("click", event => {
+      const button = event.currentTarget, selected = button.getAttribute("aria-pressed") !== "true";
+      button.setAttribute("aria-pressed", String(selected));
+      button.textContent = `HP einbeziehen: ${selected ? "Ja" : "Nein"}`;
+      stopMinimumSearch("Option geändert. Suche bei Bedarf erneut starten.");
+      document.getElementById("minimumResult").textContent = "";
+    });
+    for (const id of ["targetWinRate", "targetBossDamage"]) document.getElementById(id).addEventListener("input", () => {
+      stopMinimumSearch("");
+      document.getElementById("minimumResult").textContent = "";
+    });
+
     const statKeys = ["hp", "atk", "def", "eva", "spd", "crit"];
     const statMinimum = stat => ["eva", "spd", "crit"].includes(stat) ? 0 : 1;
     const bottleStorageKey = "flasche.savedBottles.v1";
@@ -1524,9 +1788,7 @@
       lastCalculation = null;
       updateCalculatedStats();
       scheduleFightCalculation();
-      const suggestionOutput = document.getElementById("suggestions");
-      if (suggestionOutput) suggestionOutput.textContent = "Werte geändert. Vorschläge bei Bedarf neu berechnen.";
-      for (const id of Object.keys(savedSuggestions)) delete savedSuggestions[id];
+      invalidateStatOptimizer();
     }
 
     for (const player of [1, 2]) {
@@ -1707,6 +1969,7 @@
     renderSavedBottles();
     updateCalculatedStats();
     calculateFight();
+    refreshOptimizerMode();
 
   </script>
 </body>
