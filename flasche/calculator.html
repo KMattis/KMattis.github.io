@@ -1,26 +1,49 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+  <!-- Google Analytics; local previews are excluded. -->
+  <script>
+    (() => {
+      if (["", "localhost", "127.0.0.1", "::1", "[::1]"].includes(location.hostname)) return;
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { window.dataLayer.push(arguments); };
+      window.gtag("js", new Date());
+      window.gtag("config", "G-HB0QTXQBF3", {
+        content_group: "Flasche bitte",
+        page_title: "Flasche, bitte! Kampfsimulator"
+      });
+      const tag = document.createElement("script");
+      tag.async = true;
+      tag.src = "https://www.googletagmanager.com/gtag/js?id=G-HB0QTXQBF3";
+      document.head.appendChild(tag);
+    })();
+  </script>
   <meta charset="UTF-8" />
-  <title>Flasche bitte – Kampfsimulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flasche, bitte! Kampfsimulator</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
       max-width: 1200px;
-      margin: 40px auto;
+      margin: 24px auto;
       padding: 0 16px;
       background: #f7f7f7;
     }
 
     h1 {
       text-align: center;
+      font-size: clamp(24px, 3vw, 30px);
+      margin: 0 0 12px;
     }
 
     .fighters {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 20px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      gap: 16px;
     }
+
+    .fighters > * { min-width: 0; }
 
     .card {
       background: white;
@@ -41,7 +64,7 @@
       box-sizing: border-box;
     }
 
-    button {
+    button, .jump-button {
       margin-top: 12px;
       padding: 10px 16px;
       border: none;
@@ -52,28 +75,16 @@
       font-size: 15px;
     }
 
-    button:hover {
+    button:hover, .jump-button:hover {
       background: #444;
     }
 
-    .actions {
-      text-align: center;
-    }
-
-    #result, #log, #info {
-      margin-top: 24px;
+    #result {
+      margin-top: 16px;
       background: white;
       padding: 16px;
       border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    #log {
-      white-space: pre-line;
-      max-height: 450px;
-      overflow-y: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 14px;
     }
 
     .winner {
@@ -82,20 +93,20 @@
       color: darkgreen;
     }
 
-    .formula {
-      text-align: center;
-      line-height: 1.6;
-      margin-bottom: 20px;
+    .intro {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin: 0 auto 16px;
+      line-height: 1.45;
+      font-size: 14px;
     }
 
-    .sim-card {
-      max-width: 300px;
-      margin: 20px auto;
-      background: white;
-      padding: 16px;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
+    .intro p { margin: 0; max-width: 700px; }
+    .intro .jump-button { background: #267047; margin-top: 0; white-space: nowrap; flex-shrink: 0; }
+    .intro .jump-button:hover { background: #1e5938; }
+    .jump-button { display: inline-block; text-decoration: none; }
 
     .suggestion {
       margin-top: 14px;
@@ -110,121 +121,298 @@
       font-size: 15px;
     }
 
-    @media (max-width: 900px) {
-      .fighters {
-        grid-template-columns: 1fr;
-      }
+    .muted { color: #595959; font-size: 14px; line-height: 1.5; }
+    .fighters h2 { font-size: 16px; margin: 0 0 8px; }
+    #realFight h2 { margin-top: 0; }
+    #realFight { margin-top: 16px; }
+    #realFight h2 { font-size: 18px; margin-bottom: 8px; }
+    .real-fight-table { max-width: 620px; }
+    .real-fight-table thead th:first-child { width: 42%; }
+    .table-scroll { overflow-x: auto; }
+    .compact-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+    .compact-table th, .compact-table td { padding: 8px; border-bottom: 1px solid #eee; }
+    .compact-table thead th { color: #444; font-weight: 600; white-space: nowrap; }
+    .compact-table tbody tr:last-child > * { border-bottom: 0; }
+    .fighter-table { table-layout: fixed; }
+    .fighter-table thead th:first-child { width: 40%; }
+    .fighter-table tbody th { font-weight: 500; }
+    .combat-table thead th:first-child { width: 56%; }
+    .combat-table tbody th { font-weight: 500; }
+    .combat-table tbody td { vertical-align: middle; }
+    .calculated-value { font-weight: 600; color: #267047; font-variant-numeric: tabular-nums; }
+    .stat-note { display: block; margin-top: 3px; color: #666; font-size: 11px; font-weight: 400; line-height: 1.35; }
+    .fighter-table input, .real-rounds input { margin: 0; padding: 7px 8px; min-width: 0; border: 1px solid #d5d5d5; border-radius: 6px; font: inherit; background: #fff; }
+    .fighter-table input[type="number"], .real-rounds input { font-variant-numeric: tabular-nums; }
+    .icon-button { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; min-height: 34px; padding: 5px; margin: 0; border-radius: 7px; background: #f1f3f2; color: #222; font-size: 18px; line-height: 1; vertical-align: middle; }
+    .icon-button:hover { background: #dce9df; }
+    .icon-button[data-needs-name="true"] { opacity: .45; cursor: help; }
+    .icon-button.delete:hover { background: #fbe2e2; }
+    .column-heading { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+    #bottleLibrary { margin: 0 0 12px; padding: 0 16px; }
+    #bottleLibrary > summary { padding: 12px 0; cursor: pointer; font-size: 14px; font-weight: 600; }
+    #bottleLibrary[open] > summary { border-bottom: 1px solid #eee; margin-bottom: 8px; }
+    #bottleLibrary[open] { padding-bottom: 8px; }
+    .saved-count { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 20px; background: #eef3ef; color: #42654c; font-size: 12px; }
+    #savedBottleTable { max-height: 280px; overflow: auto; }
+    .saved-table thead th { position: sticky; top: 0; background: white; z-index: 1; }
+    .saved-table .stat-line { display: inline; }
+    .saved-table .stat-line + .stat-line::before { content: " · "; }
+    .saved-table .bottle-name { min-width: 85px; max-width: 150px; overflow-wrap: anywhere; font-weight: 500; }
+    .saved-table .bottle-stats { font-size: 12px; line-height: 1.7; color: #595959; font-variant-numeric: tabular-nums; }
+    .stat-line { display: block; white-space: nowrap; }
+    .saved-table .icon-cell { width: 34px; padding-left: 3px; padding-right: 3px; text-align: center; }
+    .saved-table abbr { text-decoration: none; }
+    .saved-table thead .icon-cell { font-size: 12px; }
+    #result:empty { display: none; }
+    button:disabled { opacity: .5; cursor: default; }
+    input:focus-visible, button:focus-visible, .jump-button:focus-visible { outline: 3px solid #267047; outline-offset: 2px; }
+    #saveStatus { min-height: 1.5em; }
+    #saveStatus:empty { display: none; }
+    .real-rounds { max-width: 190px; margin-bottom: 16px; font-size: 14px; }
+    .real-rounds input { margin-top: 6px; }
+    #realFight input:invalid { border-color: #b13f39; }
+    .calculation-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .recalculate-button { margin: 0; padding: 6px 9px; background: #f1f3f2; color: #595959; font-size: 12px; }
+    .recalculate-button:hover { background: #e4e9e5; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+
+    .outcome-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-top: 16px; }
+    .outcome-heading h3 { margin: 0; }
+    .win-invitation { display: flex; align-items: center; gap: 14px; max-width: 560px; }
+    .win-invitation p { color: #46634e; font-size: 13px; line-height: 1.4; margin: 0; }
+    .win-invitation .jump-button { margin: 0; white-space: nowrap; background: #267047; font-size: 14px; }
+    .pulse-button { animation: invite-pulse 2s ease-out infinite; }
+    @keyframes invite-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(38, 112, 71, .3); }
+      70% { box-shadow: 0 0 0 9px rgba(38, 112, 71, 0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .pulse-button { animation: none; } }
+    @media (max-width: 520px) { .win-invitation { flex-wrap: wrap; gap: 10px; } }
+
+    .outcome-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+    .outcome-card { border: 1px solid #e2e7e3; border-radius: 10px; padding: 16px; background: #f5f8f6; }
+    .outcome-card.enemy { background: #fff6f5; border-color: #f0dfdc; }
+    .outcome-card.favored { border: 2px solid #37805a; padding: 15px; }
+    .outcome-card.enemy.favored { border-color: #c5534c; }
+    .outcome-card h3 { margin: 0 0 6px; font-size: 16px; }
+    .win-chance { font-size: 36px; font-weight: 700; color: #267047; font-variant-numeric: tabular-nums; }
+    .enemy .win-chance { color: #b13f39; }
+    .reserve-value { font-size: 21px; font-weight: 600; margin-top: 12px; }
+    .outcome-card .muted { margin: 5px 0 0; }
+    .histogram-scroll { overflow-x: auto; }
+    .survival-histogram { display: block; width: 100%; min-width: 0; max-width: 950px; height: auto; }
+    .histogram-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; font-size: 13px; margin-top: 20px; }
+    .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+    .reserve-explanation { margin-top: 12px; }
+    .calculation-details { border-bottom: 1px solid #eee; padding-bottom: 14px; }
+    .calculation-details table { max-width: 620px; }
+    .calculation-details tbody th { font-weight: 500; }
+    .formula-list { padding-left: 20px; font-size: 13px; line-height: 1.6; color: #595959; }
+    .formula-list li { margin: 6px 0; }
+    .reserve-explanation summary { cursor: pointer; color: #595959; font-size: 13px; }
+    summary:focus-visible { outline: 3px solid #267047; outline-offset: 2px; }
+    @media (max-width: 520px) {
+      .outcome-cards { gap: 8px; }
+      .outcome-card { padding: 12px; }
+      .outcome-card.favored { padding: 11px; }
+      .win-chance { font-size: 27px; }
+      .reserve-value { font-size: 18px; }
+    }
+
+    @media (max-width: 760px) {
+      body { margin: 16px auto; }
+      .intro { flex-direction: column; text-align: center; gap: 10px; }
+      .fighters { grid-template-columns: 1fr; gap: 12px; }
+      .saved-table .stat-line { display: block; }
+      .saved-table .stat-line + .stat-line::before { content: none; }
     }
   </style>
 </head>
 <body>
-  <h1>Kampfsimulator</h1>
+  <h1>Flasche, bitte! Kampfsimulator</h1>
 
-  <div class="formula">
-    <div><strong>Schaden = round(A × 15 / (15 + D))</strong></div>
-    <div><strong>Ausweichchance = E / (E + 270)</strong></div>
-    <div><strong>Speed:</strong> Höherer Wert greift zuerst an. Bei Gleichstand Spieler 1.</div>
+  <div class="intro">
+    <p>Hilf mit, die genauen Kampfformeln herauszufinden und den Simulator zu verbessern:
+      Trage unten im Formular die Daten deiner echten Kämpfe ein.</p>
+    <a class="jump-button" href="#realFight" onclick="goToRealFight(event)">Zum Kampfformular <span aria-hidden="true">↓</span></a>
   </div>
+
+  <details id="bottleLibrary" class="card">
+    <summary>Gespeicherte Flaschen <span id="savedBottleCount" class="saved-count">0</span></summary>
+    <p class="stat-note">Deine Flaschen werden nur lokal in diesem Browser gespeichert (Cookies/Browserspeicher).</p>
+      <p id="emptyBottleLibrary" class="muted">Noch keine Flaschen gespeichert.</p>
+      <div id="savedBottleTable" class="table-scroll" hidden>
+        <table class="compact-table saved-table" aria-label="Gespeicherte Flaschen">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Stats</th>
+              <th scope="col" class="icon-cell" title="Als Spieler laden">Spieler</th>
+              <th scope="col" class="icon-cell" title="Als Gegner laden">Gegner</th>
+              <th scope="col" class="icon-cell">Löschen</th>
+            </tr>
+          </thead>
+          <tbody id="savedBottles"></tbody>
+        </table>
+      </div>
+  </details>
 
   <div class="fighters">
-    <div class="card">
-      <h2>Spieler 1</h2>
+    <section class="card" aria-labelledby="inputValuesTitle">
+      <h2 id="inputValuesTitle">Flaschenwerte</h2>
+      <table class="compact-table fighter-table" aria-label="Flaschenwerte für Spieler und Gegner">
+        <thead>
+          <tr>
+            <th scope="col">Wert</th>
+            <th scope="col"><div class="column-heading">Spieler <button id="saveBottle1" class="icon-button" type="button" onclick="saveBottle(1)" title="Spieler-Flasche speichern" aria-label="Spieler-Flasche speichern"><span aria-hidden="true">💾</span></button></div></th>
+            <th scope="col"><div class="column-heading">Gegner <button id="saveBottle2" class="icon-button" type="button" onclick="saveBottle(2)" title="Gegner-Flasche speichern" aria-label="Gegner-Flasche speichern"><span aria-hidden="true">💾</span></button></div></th>
+          </tr>
+        </thead>
+        <tbody>
+            <tr>
+              <th scope="row">Name</th>
+              <td><input id="bottleName1" type="text" required maxlength="80" placeholder="Name" aria-label="Name der Flasche – Spieler"></td>
+              <td><input id="bottleName2" type="text" required maxlength="80" placeholder="Name" aria-label="Name der Flasche – Gegner"></td>
+            </tr>
+            <tr>
+              <th scope="row">HP</th>
+              <td><input id="hp1" type="number" value="100" min="1" max="999" step="1" aria-label="HP – Spieler"></td>
+              <td><input id="hp2" type="number" value="100" min="1" max="999" step="1" aria-label="HP – Gegner"></td>
+            </tr>
+            <tr>
+              <th scope="row">Angriff</th>
+              <td><input id="atk1" type="number" value="20" min="1" max="999" step="1" aria-label="Angriff – Spieler"></td>
+              <td><input id="atk2" type="number" value="20" min="1" max="999" step="1" aria-label="Angriff – Gegner"></td>
+            </tr>
+            <tr>
+              <th scope="row">Verteidigung</th>
+              <td><input id="def1" type="number" value="10" min="1" max="999" step="1" aria-label="Verteidigung – Spieler"></td>
+              <td><input id="def2" type="number" value="10" min="1" max="999" step="1" aria-label="Verteidigung – Gegner"></td>
+            </tr>
+            <tr>
+              <th scope="row">Ausweichen<span id="evasionNote" class="stat-note">Formel noch nicht optimal.</span></th>
+              <td><input id="eva1" aria-describedby="evasionNote" type="number" value="23" min="1" max="999" step="1" aria-label="Ausweichen – Spieler"></td>
+              <td><input id="eva2" aria-describedby="evasionNote" type="number" value="23" min="1" max="999" step="1" aria-label="Ausweichen – Gegner"></td>
+            </tr>
+            <tr>
+              <th scope="row">Geschwindigkeit<span id="speedNote" class="stat-note">Noch keine Doppeltreffer, nur Reihenfolge.</span></th>
+              <td><input id="spd1" aria-describedby="speedNote" type="number" value="10" min="1" max="999" step="1" aria-label="Geschwindigkeit – Spieler"></td>
+              <td><input id="spd2" aria-describedby="speedNote" type="number" value="10" min="1" max="999" step="1" aria-label="Geschwindigkeit – Gegner"></td>
+            </tr>
+            <tr>
+              <th scope="row">Kritisch<span id="criticalNote" class="stat-note">Noch nicht in der Kampfberechnung verwendet.</span></th>
+              <td><input id="crit1" aria-describedby="criticalNote" type="number" value="1" min="1" max="999" step="1" aria-label="Kritisch – Spieler"></td>
+              <td><input id="crit2" aria-describedby="criticalNote" type="number" value="1" min="1" max="999" step="1" aria-label="Kritisch – Gegner"></td>
+            </tr>
+        </tbody>
+      </table>
+    </section>
 
-      <label>
-        Health
-        <input id="hp1" type="number" value="100" min="1">
-      </label>
+    <section class="card" aria-labelledby="combatValuesTitle">
+      <h2 id="combatValuesTitle">Kampfwerte</h2>
+      <table class="compact-table fighter-table combat-table" aria-label="Berechnete Kampfwerte für Spieler und Gegner">
+        <thead>
+          <tr><th scope="col">Wert</th><th scope="col">Spieler</th><th scope="col">Gegner</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+              <th scope="row">Grundschaden</th>
+              <td id="calculatedDamage1" class="calculated-value">—</td>
+              <td id="calculatedDamage2" class="calculated-value">—</td>
+            </tr>
+            <tr>
+              <th scope="row">Schaden Kritisch<span class="stat-note">Aktuelle beste Schätzung, noch unbestätigt.</span></th>
+              <td id="calculatedCriticalDamage1" class="calculated-value">—</td>
+              <td id="calculatedCriticalDamage2" class="calculated-value">—</td>
+            </tr>
+            <tr>
+              <th scope="row">Chance Ausweichen<span class="stat-note">Formel noch nicht optimal.</span></th>
+              <td id="calculatedDodge1" class="calculated-value">—</td>
+              <td id="calculatedDodge2" class="calculated-value">—</td>
+            </tr>
+            <tr>
+              <th scope="row">Chance Doppelter Hit<span class="stat-note">Formel aktuell unbekannt.</span></th>
+              <td class="calculated-value">N/A</td>
+              <td class="calculated-value">N/A</td>
+            </tr>
+            <tr>
+              <th scope="row">Chance Kritischer Hit<span class="stat-note">Formel aktuell unbekannt.</span></th>
+              <td class="calculated-value">N/A</td>
+              <td class="calculated-value">N/A</td>
+            </tr>
+            <tr>
+              <th scope="row">Erster Angriff</th>
+              <td id="calculatedFirst1" class="calculated-value">—</td>
+              <td id="calculatedFirst2" class="calculated-value">—</td>
+            </tr>
+        </tbody>
+      </table>
+    </section>
 
-      <label>
-        Angriff
-        <input id="atk1" type="number" value="20" min="0">
-      </label>
-
-      <label>
-        Verteidigung
-        <input id="def1" type="number" value="10" min="0">
-      </label>
-
-      <label>
-        Ausweichen
-        <input id="eva1" type="number" value="23" min="0">
-      </label>
-
-      <label>
-        Speed
-        <input id="spd1" type="number" value="10" min="0">
-      </label>
-    </div>
-
-    <div class="card">
-      <h2>Spieler 2 / Gegner</h2>
-
-      <label>
-        Health
-        <input id="hp2" type="number" value="100" min="1">
-      </label>
-
-      <label>
-        Angriff
-        <input id="atk2" type="number" value="20" min="0">
-      </label>
-
-      <label>
-        Verteidigung
-        <input id="def2" type="number" value="10" min="0">
-      </label>
-
-      <label>
-        Ausweichen
-        <input id="eva2" type="number" value="23" min="0">
-      </label>
-
-      <label>
-        Speed
-        <input id="spd2" type="number" value="10" min="0">
-      </label>
-    </div>
-
-    <div class="card">
-      <h2>Minimal viable Flasche</h2>
-
-      <label>
-        Ziel-Gewinnchance in %
-        <input id="targetWinRate" type="number" value="80" min="1" max="100">
-      </label>
-
-      <label>
-        Simulationen pro Vorschlag
-        <input id="suggestionSims" type="number" value="1000" min="100">
-      </label>
-
-      <button onclick="calculateSuggestions()">Vorschläge berechnen</button>
-
-      <div id="suggestions">
-        Noch keine Vorschläge berechnet.
-      </div>
-    </div>
   </div>
 
-  <div class="sim-card">
-    <label>
-      Anzahl Simulationen
-      <input id="numSims" type="number" value="10000" min="1">
-    </label>
-  </div>
 
-  <div class="actions">
-    <button onclick="simulateOneFightAndShowLog()">Einzelkampf simulieren</button>
-    <button onclick="simulateManyFights()">n Kämpfe simulieren</button>
-  </div>
 
-  <div id="info"></div>
+  <p id="saveStatus" role="status"></p>
+
+
+
   <div id="result"></div>
-  <div id="log"></div>
+
+  <section id="realFight" class="card" aria-labelledby="realFightTitle" tabindex="-1">
+    <h2 id="realFightTitle">Echter Kampf</h2>
+    <p class="muted">Flaschenwerte oben eintragen, beobachtete Treffer hier ergänzen. Unbekannte Werte leer lassen (N/A); 0 bedeutet, dass kein solcher Treffer vorkam.</p>
+    <label class="real-rounds">Anzahl Runden
+      <input id="realRounds" type="number" min="1" step="1" title="N/A oder ganze Zahl ab 1" placeholder="N/A">
+    </label>
+    <table class="compact-table fighter-table real-fight-table" aria-label="Beobachtungen aus einem echten Kampf">
+      <thead>
+        <tr>
+          <th scope="col">Beobachtung</th>
+          <th scope="col">Spieler</th>
+          <th scope="col">Gegner</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr>
+            <th scope="row">Ausgewichen</th>
+            <td><input id="realEvaded1" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Ausgewichen – Spieler im echten Kampf"></td>
+            <td><input id="realEvaded2" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Ausgewichen – Gegner im echten Kampf"></td>
+          </tr>
+          <tr>
+            <th scope="row">Kritische Treffer</th>
+            <td><input id="realCritical1" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Kritische Treffer – Spieler im echten Kampf"></td>
+            <td><input id="realCritical2" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Kritische Treffer – Gegner im echten Kampf"></td>
+          </tr>
+          <tr>
+            <th scope="row">Doppeltreffer</th>
+            <td><input id="realDouble1" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Doppeltreffer – Spieler im echten Kampf"></td>
+            <td><input id="realDouble2" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Doppeltreffer – Gegner im echten Kampf"></td>
+          </tr>
+      </tbody>
+    </table>
+    <p class="muted">Ausgewichen zählt vermiedene gegnerische Angriffe; kritische Treffer und Doppeltreffer zählen eigene Treffer.</p>
+    <button id="submitRealFight" type="button">Submit</button>
+    <p id="realFightStatus" class="muted" role="status" aria-live="polite" hidden></p>
+  </section>
+
 
   <script>
+    function goToRealFight(event) {
+      event.preventDefault();
+      const form = document.getElementById("realFight");
+      form.scrollIntoView({ block: "start" });
+      form.focus({ preventScroll: true });
+    }
+
     function damage(attack, defense) {
       return Math.round(attack * 15 / (15 + defense));
+    }
+
+    // Display-only estimate; critical hits are not included in fight probabilities yet.
+    function criticalDamage(attack, defense, critical) {
+      return Math.round(damage(attack, defense) * (2 + critical / 100));
     }
 
     function dodgeChance(evasion) {
@@ -245,13 +433,14 @@
 
     function readFighters() {
       const p1 = {
-        name: "Spieler 1",
+        name: "Spieler",
         hp: getNumber("hp1"),
         maxHp: getNumber("hp1"),
         atk: getNumber("atk1"),
         def: getNumber("def1"),
         eva: getNumber("eva1"),
-        spd: getNumber("spd1")
+        spd: getNumber("spd1"),
+        crit: getNumber("crit1")
       };
 
       const p2 = {
@@ -261,195 +450,342 @@
         atk: getNumber("atk2"),
         def: getNumber("def2"),
         eva: getNumber("eva2"),
-        spd: getNumber("spd2")
+        spd: getNumber("spd2"),
+        crit: getNumber("crit2")
       };
 
       return { p1, p2 };
     }
 
-    function cloneFighter(f) {
-      return {
-        name: f.name,
-        hp: f.maxHp,
-        maxHp: f.maxHp,
-        atk: f.atk,
-        def: f.def,
-        eva: f.eva,
-        spd: f.spd
-      };
-    }
-
-    function attack(attacker, defender, roundLabel, withLog) {
-      const chance = dodgeChance(defender.eva);
-
-      if (Math.random() < chance) {
-        return {
-          damage: 0,
-          dodged: true,
-          text: withLog
-            ? `${roundLabel}: ${attacker.name} greift an, aber ${defender.name} weicht aus.`
-            : ""
-        };
+    function calculateExactCombat(p1, p2) {
+      const firstIsPlayer = p1.spd >= p2.spd;
+      const first = firstIsPlayer ? p1 : p2;
+      const second = firstIsPlayer ? p2 : p1;
+      const firstSide = firstIsPlayer ? "p1" : "p2";
+      const secondSide = firstIsPlayer ? "p2" : "p1";
+      const firstDamage = damage(first.atk, second.def);
+      const secondDamage = damage(second.atk, first.def);
+      const firstHit = 270 / (second.eva + 270);
+      const secondHit = 270 / (first.eva + 270);
+      const firstNeeds = firstDamage ? Math.ceil(second.maxHp / firstDamage) : Infinity;
+      const secondNeeds = secondDamage ? Math.ceil(first.maxHp / secondDamage) : Infinity;
+      const outcomes = [];
+      function addOutcome(side, hp, probability, winner, opponent) {
+        if (probability > 0) outcomes.push({ winner: side, probability, extraRounds: expectedExtraRounds(hp, winner, opponent) });
       }
-
-      const dmg = damage(attacker.atk, defender.def);
-      defender.hp -= dmg;
-      if (defender.hp < 0) defender.hp = 0;
-
-      return {
-        damage: dmg,
-        dodged: false,
-        text: withLog
-          ? `${roundLabel}: ${attacker.name} greift an und macht ${dmg} Schaden. ${defender.name} hat noch ${defender.hp} HP.`
-          : ""
-      };
-    }
-
-    function simulateFight(baseP1, baseP2, withLog = false) {
-      const p1 = cloneFighter(baseP1);
-      const p2 = cloneFighter(baseP2);
-
-      let first, second;
-
-      if (p1.spd >= p2.spd) {
-        first = p1;
-        second = p2;
-      } else {
-        first = p2;
-        second = p1;
+      function finish(avgRounds, drawRate = 0) {
+        const total = outcomes.reduce((sum, item) => sum + item.probability, 0) + drawRate;
+        // Correct only accumulated floating-point roundoff; no outcomes are sampled or truncated.
+        for (const item of outcomes) item.probability /= total;
+        const p1WinRate = outcomes.filter(item => item.winner === "p1").reduce((sum, item) => sum + item.probability, 0);
+        const p2WinRate = outcomes.filter(item => item.winner === "p2").reduce((sum, item) => sum + item.probability, 0);
+        return { p1WinRate, p2WinRate, drawRate: drawRate / total, avgRounds, outcomes };
       }
-
-      let round = 1;
-      let log = "";
-
-      while (p1.hp > 0 && p2.hp > 0 && round <= 1000) {
-        const result1 = attack(first, second, `Runde ${round}`, withLog);
-        if (withLog) log += result1.text + "\n";
-
-        if (second.hp <= 0) break;
-
-        const result2 = attack(second, first, `Runde ${round}`, withLog);
-        if (withLog) log += result2.text + "\n\n";
-
-        round++;
+      if (!firstDamage && !secondDamage) return finish(Infinity, 1);
+      if (!secondDamage) {
+        addOutcome(firstSide, first.maxHp, 1, first, second);
+        return finish(firstNeeds / firstHit);
       }
-
-      let winner = "draw";
-
-      if (p1.hp > 0 && p2.hp <= 0) {
-        winner = "p1";
-      } else if (p2.hp > 0 && p1.hp <= 0) {
-        winner = "p2";
+      if (!firstDamage) {
+        addOutcome(secondSide, second.maxHp, 1, second, first);
+        return finish(secondNeeds / secondHit);
       }
-
-      return {
-        winner,
-        p1Hp: p1.hp,
-        p2Hp: p2.hp,
-        rounds: round,
-        log
-      };
-    }
-
-    function estimateWinRate(p1, p2, n) {
-      let p1Wins = 0;
-      let p2Wins = 0;
-      let draws = 0;
-      let totalRounds = 0;
-
-      for (let i = 0; i < n; i++) {
-        const result = simulateFight(p1, p2, false);
-
-        if (result.winner === "p1") {
-          p1Wins++;
-        } else if (result.winner === "p2") {
-          p2Wins++;
+      if (firstHit === 1 && secondHit === 1) {
+        if (firstNeeds <= secondNeeds) {
+          addOutcome(firstSide, first.maxHp - (firstNeeds - 1) * secondDamage, 1, first, second);
         } else {
-          draws++;
+          addOutcome(secondSide, second.maxHp - secondNeeds * firstDamage, 1, second, first);
         }
-
-        totalRounds += result.rounds;
+        return finish(Math.min(firstNeeds, secondNeeds));
+      }
+      if (firstNeeds * secondNeeds > 4000000 || firstNeeds + secondNeeds > 100000) {
+        throw new RangeError("Diese Werte benötigen zu viele Trefferzustände für die exakte Berechnung im Browser. Bitte kleinere HP- oder größere Angriffswerte verwenden.");
       }
 
+      // State (i,j): first has landed i hits, second j hits; a new round starts.
+      // Remove the both-miss self-loop analytically. The remaining transitions
+      // always increase i or j, so two rows cover the entire infinite-duration fight.
+      const progress = firstHit + secondHit - firstHit * secondHit;
+      const firstOnly = firstHit * (1 - secondHit) / progress;
+      const secondOnly = (1 - firstHit) * secondHit / progress;
+      const bothHit = firstHit * secondHit / progress;
+      const firstWins = new Float64Array(secondNeeds);
+      const secondWins = new Float64Array(firstNeeds);
+      let row = new Float64Array(secondNeeds);
+      let next = new Float64Array(secondNeeds);
+      row[0] = 1;
+      let avgRounds = 0;
+      for (let i = 0; i < firstNeeds; i++) {
+        next.fill(0);
+        for (let j = 0; j < secondNeeds; j++) {
+          const mass = row[j];
+          if (!mass) continue;
+          avgRounds += mass / progress;
+          if (i === firstNeeds - 1) {
+            // A lethal first attack prevents the second attack in this round.
+            firstWins[j] += mass * firstHit / progress;
+          } else {
+            next[j] += mass * firstOnly;
+            if (j === secondNeeds - 1) secondWins[i + 1] += mass * bothHit;
+            else next[j + 1] += mass * bothHit;
+          }
+          if (j === secondNeeds - 1) secondWins[i] += mass * secondOnly;
+          else row[j + 1] += mass * secondOnly;
+        }
+        [row, next] = [next, row];
+      }
+      for (let j = 0; j < firstWins.length; j++) {
+        addOutcome(firstSide, first.maxHp - j * secondDamage, firstWins[j], first, second);
+      }
+      for (let i = 0; i < secondWins.length; i++) {
+        addOutcome(secondSide, second.maxHp - i * firstDamage, secondWins[i], second, first);
+      }
+      return finish(avgRounds);
+    }
+
+    // Keep the existing suggestion calculator usable with deterministic results.
+    function estimateWinRate(p1, p2) {
+      const result = calculateExactCombat(p1, p2);
+      return { winRate: result.p1WinRate, avgRounds: result.avgRounds };
+    }
+
+    function updateCalculatedStats() {
+      const ids = ["calculatedDamage1", "calculatedDamage2", "calculatedCriticalDamage1", "calculatedCriticalDamage2", "calculatedDodge1", "calculatedDodge2", "calculatedFirst1", "calculatedFirst2"];
+      if (!validateFighters([1, 2], false)) {
+        for (const id of ids) document.getElementById(id).textContent = "—";
+        return;
+      }
+      const { p1, p2 } = readFighters();
+      document.getElementById("calculatedDamage1").textContent = damage(p1.atk, p2.def);
+      document.getElementById("calculatedDamage2").textContent = damage(p2.atk, p1.def);
+      document.getElementById("calculatedCriticalDamage1").textContent = criticalDamage(p1.atk, p2.def, p1.crit);
+      document.getElementById("calculatedCriticalDamage2").textContent = criticalDamage(p2.atk, p1.def, p2.crit);
+      document.getElementById("calculatedDodge1").textContent = percent(dodgeChance(p1.eva));
+      document.getElementById("calculatedDodge2").textContent = percent(dodgeChance(p2.eva));
+      document.getElementById("calculatedFirst1").textContent = p1.spd >= p2.spd ? "Ja" : "Nein";
+      document.getElementById("calculatedFirst2").textContent = p2.spd > p1.spd ? "Ja" : "Nein";
+    }
+
+    let lastCalculation = null;
+    let fightCalculationTimer;
+
+    function calculationHeaderHtml(title) {
+      return `<div class="calculation-heading"><div class="winner">${title}</div>
+        <button class="recalculate-button" type="button" onclick="calculateFight(true)">Neu berechnen</button></div>`;
+    }
+
+    function scheduleFightCalculation() {
+      clearTimeout(fightCalculationTimer);
+      fightCalculationTimer = setTimeout(() => calculateFight(), 150);
+    }
+
+    function calculateFight(reportErrors = false) {
+      clearTimeout(fightCalculationTimer);
+      const panel = document.getElementById("result");
+      if (!validateFighters([1, 2], reportErrors)) {
+        lastCalculation = null;
+        panel.innerHTML = calculationHeaderHtml("Werte prüfen") + '<p class="muted">Bitte für alle sechs Kampfwerte ganze Zahlen von 1 bis 999 eingeben.</p>';
+        return;
+      }
+      const { p1, p2 } = readFighters();
+      const detailsOpen = panel.querySelector(".calculation-details")?.open || false;
+      try {
+        lastCalculation = calculateExactCombat(p1, p2);
+      } catch (error) {
+        lastCalculation = null;
+        panel.innerHTML = calculationHeaderHtml("Berechnung nicht möglich");
+        const message = document.createElement("p");
+        message.textContent = error.message;
+        panel.append(message);
+        return;
+      }
+      updateCalculatedStats();
+      panel.innerHTML = `
+        ${calculationHeaderHtml("Berechnung abgeschlossen")}
+        ${calculationDetailsHtml(p1, p2)}
+        <section aria-label="Siegchancen und Überlebensreserve"><div id="survivalDistribution"></div></section>
+      `;
+      renderSurvivalDistribution();
+      if (detailsOpen) panel.querySelector(".calculation-details").open = true;
+    }
+
+    function calculationDetailsHtml(p1, p2) {
+      const rows = [
+        ["HP", p1.maxHp, p2.maxHp],
+        ["Angriff", p1.atk, p2.atk],
+        ["Verteidigung", p1.def, p2.def],
+        ["Ausweichen", p1.eva, p2.eva],
+        ["Geschwindigkeit", p1.spd, p2.spd],
+        ["Kritisch (nur Anzeige)", p1.crit, p2.crit],
+        ["Grundschaden", damage(p1.atk, p2.def), damage(p2.atk, p1.def)],
+        ["Schaden Kritisch (Schätzung)", criticalDamage(p1.atk, p2.def, p1.crit), criticalDamage(p2.atk, p1.def, p2.crit)],
+        ["Chance Ausweichen", percent(dodgeChance(p1.eva)), percent(dodgeChance(p2.eva))],
+        ["Chance Doppelter Hit (unbekannt)", "N/A", "N/A"],
+        ["Chance Kritischer Hit (unbekannt)", "N/A", "N/A"],
+        ["Erster Angriff", p1.spd >= p2.spd ? "Ja" : "Nein", p2.spd > p1.spd ? "Ja" : "Nein"]
+      ];
+      return `<details class="reserve-explanation calculation-details">
+        <summary>Verwendete Formeln und Werte</summary>
+        <p class="muted"><strong>Für Gewinnchance, Kampfdauer und Überlebensreserve verwendet:</strong></p>
+        <ul class="formula-list">
+          <li><strong>HP:</strong> Bestimmt, wie viel Schaden eine Flasche übersteht.</li>
+          <li><strong>Angriff und gegnerische Verteidigung:</strong> Bestimmen den Grundschaden pro gelandetem Treffer.</li>
+          <li><strong>Ausweichen:</strong> Bestimmt die Ausweichchance mit der aktuellen, noch nicht optimalen Formel.</li>
+          <li><strong>Geschwindigkeit:</strong> Bestimmt ausschließlich, wer zuerst angreift; bei Gleichstand beginnt der Spieler.</li>
+        </ul>
+        <p class="muted"><strong>Aktuell nicht in der Kampfberechnung berücksichtigt:</strong></p>
+        <ul class="formula-list">
+          <li><strong>Kritisch und kritische Treffer:</strong> Die Trefferchance ist unbekannt. Der geschätzte kritische Schaden wird nur angezeigt und beeinflusst die Ergebnisse nicht.</li>
+          <li><strong>Doppeltreffer:</strong> Die Chance ist unbekannt. Jede Flasche hat höchstens einen Angriff pro Runde; Geschwindigkeit gewährt keine zusätzlichen Angriffe.</li>
+          <li><strong>Eingereichte echte Kämpfe:</strong> Die Daten werden zur späteren Verbesserung gesammelt und ändern die Formeln nicht automatisch.</li>
+        </ul>
+        <p class="muted">Werte zum Zeitpunkt dieser Berechnung:</p>
+        <div class="table-scroll"><table class="compact-table" aria-label="Werte der aktuellen Berechnung">
+          <thead><tr><th scope="col">Wert</th><th scope="col">Spieler</th><th scope="col">Gegner</th></tr></thead>
+          <tbody>${rows.map(([label, a, b]) => `<tr><th scope="row">${label}</th><td>${a}</td><td>${b}</td></tr>`).join("")}</tbody>
+        </table></div>
+        <ul class="formula-list">
+          <li><strong>Schaden:</strong> round(Angriff × 15 / (15 + gegnerische Verteidigung))</li>
+          <li><strong>Schaden Kritisch (nur Anzeige):</strong> round(Grundschaden × (2 + Kritisch / 100)). Aktuelle beste Schätzung, noch unbestätigt.</li>
+          <li><strong>Chance Ausweichen:</strong> Ausweichen / (Ausweichen + 270)</li>
+          <li><strong>Trefferchance:</strong> 270 / (Ausweichen des Verteidigers + 270)</li>
+          <li><strong>Erster Angriff:</strong> Höhere Geschwindigkeit beginnt; bei Gleichstand Spieler. Eine Attacke je Flasche und Runde.</li>
+          <li><strong>Reserve nach Sieg:</strong> ceil(Rest-HP / gegnerischer Schaden) / gegnerische Trefferchance − 1.
+            Bei 0 gegnerischem Schaden ist die Reserve unbegrenzt (∞).</li>
+        </ul>
+        <p class="muted">Die Gewinnwahrscheinlichkeiten ergeben sich direkt aus allen möglichen Treffer- und Ausweichfolgen,
+          ohne Zufallssimulation und ohne Rundenlimit. Kritische Treffer und Doppeltreffer sind noch nicht enthalten.</p>
+        <p class="muted">Die Reserve ist die erwartete Zahl weiterer überstandener gegnerischer Angriffe nach einem Sieg;
+          der tödliche Angriff zählt nicht mit. Mittelwert und 90%-Reserve gelten nur für die Siege der jeweiligen Seite.
+          Die Balkenhöhen zeigen die unbedingten Wahrscheinlichkeiten; pro Seite summieren sie sich zur Gewinnchance.
+          Alle Ergebnisse gelten unter den aktuell verwendeten Kampfformeln.</p>
+      </details>`;
+    }
+
+    function expectedExtraRounds(remainingHp, winner, opponent) {
+      const incomingDamage = damage(opponent.atk, winner.def);
+      if (incomingDamage === 0) return Infinity;
+      const hitsUntilDefeat = Math.ceil(remainingHp / incomingDamage);
+      const hitProbability = 270 / (winner.eva + 270);
+      return Math.max(0, hitsUntilDefeat / hitProbability - 1);
+    }
+
+    function formatReserve(value, digits = 1) {
+      if (value === null) return "—";
+      if (value === Infinity) return "∞";
+      return value.toLocaleString("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    }
+
+    function summarizeReserves(outcomes) {
+      const probability = outcomes.reduce((sum, item) => sum + item.probability, 0);
+      if (!probability) return null;
+      const sorted = [...outcomes].sort((a, b) => a.extraRounds - b.extraRounds);
+      let cumulative = 0, conservative = sorted[sorted.length - 1].extraRounds;
+      for (const item of sorted) {
+        cumulative += item.probability;
+        if (cumulative + probability * 1e-14 >= 0.1 * probability) {
+          conservative = item.extraRounds;
+          break;
+        }
+      }
       return {
-        p1Wins,
-        p2Wins,
-        draws,
-        winRate: p1Wins / n,
-        avgRounds: totalRounds / n
+        probability,
+        mean: outcomes.reduce((sum, item) => sum + item.probability * item.extraRounds, 0) / probability,
+        conservative
       };
     }
 
-    function showInfo(p1, p2) {
-      const dmg1to2 = damage(p1.atk, p2.def);
-      const dmg2to1 = damage(p2.atk, p1.def);
-      const eva1 = dodgeChance(p1.eva);
-      const eva2 = dodgeChance(p2.eva);
-
-      let firstName = p1.spd >= p2.spd ? "Spieler 1" : "Gegner";
-
-      document.getElementById("info").innerHTML = `
-        <strong>Kampfwerte:</strong><br>
-        Spieler 1 macht ${dmg1to2} Schaden, falls der Gegner nicht ausweicht.<br>
-        Gegner macht ${dmg2to1} Schaden, falls Spieler 1 nicht ausweicht.<br>
-        Spieler 1 Ausweichchance: ${percent(eva1)}<br>
-        Gegner Ausweichchance: ${percent(eva2)}<br>
-        Erster Angriff: ${firstName}
-      `;
-    }
-
-    function simulateOneFightAndShowLog() {
-      const { p1, p2 } = readFighters();
-      showInfo(p1, p2);
-
-      const result = simulateFight(p1, p2, true);
-
-      let resultText = "";
-
-      if (result.winner === "p1") {
-        resultText = `<div class="winner">Spieler 1 gewinnt!</div>`;
-      } else if (result.winner === "p2") {
-        resultText = `<div class="winner">Gegner gewinnt!</div>`;
-      } else {
-        resultText = `<div class="winner">Unentschieden oder Kampf abgebrochen.</div>`;
+    function makeCombinedReserveBins(outcomes) {
+      const finiteWins = outcomes.filter(item => item.probability > 0 && Number.isFinite(item.extraRounds));
+      if (!finiteWins.length) return [];
+      const maximum = finiteWins.reduce((maximum, item) => Math.max(maximum, item.extraRounds), 0);
+      const width = Math.max(1, Math.ceil(maximum / 6));
+      const maxFor = side => finiteWins.reduce((maximum, item) => item.winner === side ? Math.max(maximum, item.extraRounds) : maximum, 0);
+      const negativeCount = Math.floor(maxFor("p2") / width) + 1;
+      const positiveCount = Math.floor(maxFor("p1") / width) + 1;
+      const bins = [];
+      for (let i = negativeCount - 1; i >= 0; i--) bins.push({ side: "p2", start: i * width, end: (i + 1) * width, signedStart: -(i + 1) * width, probability: 0 });
+      for (let i = 0; i < positiveCount; i++) bins.push({ side: "p1", start: i * width, end: (i + 1) * width, signedStart: i * width, probability: 0 });
+      for (const item of finiteWins) {
+        const index = Math.floor(item.extraRounds / width);
+        const binIndex = item.winner === "p1" ? negativeCount + index : negativeCount - 1 - index;
+        bins[binIndex].probability += item.probability;
       }
-
-      resultText += `
-        <p>
-          Endstand:<br>
-          Spieler 1: ${result.p1Hp} / ${p1.maxHp} HP<br>
-          Gegner: ${result.p2Hp} / ${p2.maxHp} HP<br>
-          Runden: ${result.rounds}
-        </p>
-      `;
-
-      document.getElementById("result").innerHTML = resultText;
-      document.getElementById("log").textContent = result.log;
+      return bins;
     }
 
-    function simulateManyFights() {
-      const { p1, p2 } = readFighters();
-      showInfo(p1, p2);
+    function histogramHtml(bins, chartWidth = 760) {
+      const left = 65, top = 35, plotWidth = chartWidth - 85, plotHeight = 190;
+      const maxPercent = Math.max(10, Math.ceil(Math.max(...bins.map(bin => 100 * bin.probability)) / 10) * 10);
+      const slot = plotWidth / bins.length;
+      const negativeCount = bins.filter(bin => bin.side === "p2").length;
+      const zeroX = left + negativeCount * slot;
+      const tickLabel = value => value.toLocaleString("de-DE", Math.abs(value) >= 10000 ? { notation: "compact", maximumFractionDigits: 1 } : {});
+      let content = '<title id="reserveChartTitle">Siegchancen und Überlebensreserve: Gegner links in Rot, Spieler rechts in Grün</title>';
+      content += '<desc id="reserveChartDescription">Der Abstand von null zeigt die erwarteten weiteren Runden nach einem Sieg. Balkenhöhen zeigen die berechneten Wahrscheinlichkeiten. Negative Werte kennzeichnen Gegner-Siege, nicht negative Überlebensreserven.</desc>';
+      content += '<text x="65" y="18" font-size="12" fill="#595959">Wahrscheinlichkeit (%)</text>';
+      for (let i = 0; i <= 4; i++) {
+        const value = maxPercent * i / 4;
+        const y = top + plotHeight - plotHeight * i / 4;
+        content += `<line x1="${left}" y1="${y}" x2="${left + plotWidth}" y2="${y}" stroke="#e4e9e5"/>`;
+        content += `<text x="${left - 10}" y="${y + 4}" text-anchor="end" font-size="12" fill="#595959">${value.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%</text>`;
+      }
+      bins.forEach((bin, i) => {
+        const barHeight = plotHeight * (100 * bin.probability) / maxPercent;
+        const x = left + i * slot + slot * 0.08;
+        const y = top + plotHeight - barHeight;
+        const color = bin.side === "p1" ? "#37805a" : "#c5534c";
+        const name = bin.side === "p1" ? "Spieler" : "Gegner";
+        content += `<rect x="${x}" y="${y}" width="${slot * 0.84}" height="${barHeight}" rx="3" fill="${color}"><title>${name}: ${tickLabel(bin.start)} bis unter ${tickLabel(bin.end)} weitere Runden · ${percent(bin.probability)} Wahrscheinlichkeit</title></rect>`;
+        if (slot >= 30 || i % 2 === 0 || bin.signedStart === 0) {
+          content += `<text x="${left + i * slot}" y="247" text-anchor="middle" font-size="11" fill="#444">${tickLabel(bin.signedStart)}</text>`;
+        }
+      });
+      const last = bins[bins.length - 1];
+      content += `<text x="${left + plotWidth}" y="247" text-anchor="middle" font-size="11" fill="#444">${tickLabel(last.end)}</text>`;
+      content += `<line x1="${zeroX}" y1="${top}" x2="${zeroX}" y2="${top + plotHeight}" stroke="#4a5350" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+      content += `<text x="${left + plotWidth / 2}" y="285" text-anchor="middle" font-size="13" fill="#444">Weitere Runden nach dem Sieg</text>`;
+      return `<div class="histogram-scroll"><svg class="survival-histogram" viewBox="0 0 ${chartWidth} 310" role="img" aria-labelledby="reserveChartTitle reserveChartDescription" xmlns="http://www.w3.org/2000/svg">${content}</svg></div>`;
+    }
 
-      const n = Math.max(1, Math.floor(getNumber("numSims")));
-      const stats = estimateWinRate(p1, p2, n);
+    function renderSurvivalDistribution() {
+      if (!lastCalculation) return;
+      const panel = document.getElementById("survivalDistribution");
+      const valuesFor = side => lastCalculation.outcomes.filter(item => item.winner === side);
+      const player = valuesFor("p1"), enemy = valuesFor("p2");
+      const bins = makeCombinedReserveBins(lastCalculation.outcomes);
+      const playerRate = lastCalculation.p1WinRate, enemyRate = lastCalculation.p2WinRate;
+      const favorite = Math.abs(playerRate - enemyRate) < 1e-12 ? playerRate ? "Kein klarer Favorit" : "Kein Sieger" : playerRate > enemyRate ? "Spieler ist Favorit" : "Gegner ist Favorit";
+      function outcomeCard(side, name, outcomes, probability, otherProbability) {
+        const summary = summarizeReserves(outcomes);
+        const favored = probability > otherProbability + 1e-12 ? " favored" : "";
+        return `<div class="outcome-card${side === "p2" ? " enemy" : ""}${favored}">
+          <h3>${name}</h3>
+          <div class="win-chance">${percent(probability)}</div>
+          <span class="muted">Gewinnchance</span>
+          ${summary ? `<div class="reserve-value">Ø ${formatReserve(summary.mean)} Runden Reserve</div>
+            <p class="muted">Nach einem Sieg</p>
+            <p class="muted">In mindestens 90% der Siege: ${formatReserve(summary.conservative)} weitere Runden.</p>`
+            : '<p class="muted">Keine Siege, daher keine Reserve.</p>'}
+        </div>`;
+      }
+      const infinitePlayer = player.filter(item => item.extraRounds === Infinity).reduce((sum, item) => sum + item.probability, 0);
+      const infiniteEnemy = enemy.filter(item => item.extraRounds === Infinity).reduce((sum, item) => sum + item.probability, 0);
+      panel.innerHTML = `
+        <div class="outcome-heading">
+          <h3>${favorite}</h3>
+          ${playerRate >= 0.96 ? `<div class="win-invitation">
+            <p>Sieht nach einem Sieg aus! Spiele den Kampf in der App und hilf mit echten Kampfdaten, den Simulator zu verbessern.</p>
+            <a class="jump-button pulse-button" href="#realFight" onclick="goToRealFight(event)">Kampfdaten eintragen <span aria-hidden="true">↓</span></a>
+          </div>` : ""}
+        </div>
+        <div class="outcome-cards">${outcomeCard("p1", "Spieler", player, playerRate, enemyRate)}${outcomeCard("p2", "Gegner", enemy, enemyRate, playerRate)}</div>
+        <p class="muted">Je weiter ein Balken von 0 entfernt ist, desto größer die Reserve nach dem Sieg.</p>
+        ${bins.length ? `<div class="histogram-legend"><span><span class="legend-dot" style="background:#c5534c"></span>Gegner-Siege (links)</span><span><span class="legend-dot" style="background:#37805a"></span>Spieler-Siege (rechts)</span></div>${histogramHtml(bins, Math.max(280, Math.min(760, panel.clientWidth || 760)))}` : ""}
+        ${infinitePlayer || infiniteEnemy ? `<p class="muted">Unbegrenzte Reserve (∞): Spieler ${percent(infinitePlayer)}, Gegner ${percent(infiniteEnemy)} Wahrscheinlichkeit. Der jeweilige Gegner verursacht 0 Schaden; diese Siege sind nicht als Balken dargestellt.</p>` : ""}
+        ${lastCalculation.drawRate === 1 ? '<p>Beide Flaschen verursachen 0 Schaden. Der Kampf endet nie; es gibt keine Überlebensreserve nach einem Sieg.</p>' : ""}
 
-      document.getElementById("result").innerHTML = `
-        <div class="winner">Simulation abgeschlossen</div>
-        <p>
-          Anzahl Kämpfe: ${n}<br><br>
-
-          <strong>Gewinnwahrscheinlichkeit:</strong><br>
-          Spieler 1: ${percent(stats.winRate)} (${stats.p1Wins} Siege)<br>
-          Gegner: ${percent(stats.p2Wins / n)} (${stats.p2Wins} Siege)<br>
-          Unentschieden/Abbruch: ${percent(stats.draws / n)} (${stats.draws})<br><br>
-
-          Durchschnittliche Rundenzahl: ${stats.avgRounds.toFixed(2)}
-        </p>
       `;
-
-      document.getElementById("log").textContent =
-        "Für Mehrfachsimulationen wird kein Kampflog ausgegeben. Nutze „Einzelkampf simulieren“ für ein detailliertes Log.";
     }
 
     function scoreBottle(p) {
@@ -466,7 +802,8 @@
           Angriff: ${p.atk}<br>
           Verteidigung: ${p.def}<br>
           Ausweichen: ${p.eva}<br>
-          Speed: ${p.spd}<br>
+          Geschwindigkeit: ${p.spd}<br>
+          Kritisch: ${p.crit}<br>
           Gewinnchance: ${percent(stats.winRate)}<br>
           Ø Runden: ${stats.avgRounds.toFixed(2)}<br>
           Score: ${scoreBottle(p).toFixed(1)}<br>
@@ -486,31 +823,38 @@
       setNumber("def1", p.def);
       setNumber("eva1", p.eva);
       setNumber("spd1", p.spd);
+      setNumber("crit1", p.crit);
+      fighterValuesChanged();
 
       const { p1, p2 } = readFighters();
-      showInfo(p1, p2);
+      updateCalculatedStats();
     }
 
     function calculateSuggestions() {
+      if (!validateFighters()) return;
       const { p1, p2 } = readFighters();
 
-      const target = Math.max(0.01, Math.min(1, getNumber("targetWinRate") / 100));
-      const sims = Math.max(100, Math.floor(getNumber("suggestionSims")));
+      const targetInput = document.getElementById("targetWinRate");
+      const simsInput = document.getElementById("suggestionSims");
+      if ([targetInput, simsInput].some(input => input && !input.reportValidity())) return;
+      const target = Math.max(0.01, Math.min(1, Number(targetInput ? targetInput.value : 80) / 100));
+      const sims = Math.max(100, Math.floor(Number(simsInput ? simsInput.value : 1000)));
 
       const base = {
-        name: "Spieler 1",
+        name: "Spieler",
         hp: p1.maxHp,
         maxHp: p1.maxHp,
         atk: p1.atk,
         def: p1.def,
         eva: p1.eva,
-        spd: Math.max(p1.spd, p2.spd + 1)
+        spd: Math.max(p1.spd, p2.spd + 1),
+        crit: p1.crit
       };
 
       const suggestions = [];
 
       // Angriff-Build:
-      // HP/Def/Ausweichen bleiben wie bei Spieler 1, Speed wird so gesetzt,
+      // HP/Def/Ausweichen bleiben wie bei Spieler, Geschwindigkeit wird so gesetzt,
       // dass man anfängt, Angriff wird erhöht.
       let bestAttack = null;
       for (let atk = Math.max(1, base.atk); atk <= 1000; atk++) {
@@ -539,7 +883,7 @@
       }
 
       // Defense-Build:
-      // HP/Angriff/Ausweichen bleiben wie bei Spieler 1, Speed wird so gesetzt,
+      // HP/Angriff/Ausweichen bleiben wie bei Spieler, Geschwindigkeit wird so gesetzt,
       // dass man anfängt, Verteidigung wird erhöht.
       let bestDefense = null;
       for (let def = Math.max(0, base.def); def <= 1000; def++) {
@@ -603,7 +947,7 @@
         html = `
           <p>
             Keine passende Flasche gefunden.
-            Erhöhe ggf. die aktuellen Grundwerte von Spieler 1 oder senke die Ziel-Gewinnchance.
+            Erhöhe ggf. die aktuellen Grundwerte von Spieler oder senke die Ziel-Gewinnchance.
           </p>
         `;
       } else {
@@ -613,8 +957,366 @@
         }
       }
 
-      document.getElementById("suggestions").innerHTML = html;
+      const suggestionOutput = document.getElementById("suggestions");
+      if (suggestionOutput) suggestionOutput.innerHTML = html;
     }
+    const statKeys = ["hp", "atk", "def", "eva", "spd", "crit"];
+    const bottleStorageKey = "flasche.savedBottles.v1";
+    const bottleCookieName = "flasche_bottles_v1";
+    let bottleRevision = 0;
+
+    function validateFighters(players = [1, 2], report = true) {
+      for (const player of players) {
+        for (const stat of statKeys) {
+          const input = document.getElementById(stat + player);
+          const value = Number(input.value);
+          const valid = input.value.trim() !== "" && Number.isSafeInteger(value) && value >= 1 && value < 1000;
+          input.setCustomValidity(valid ? "" : "Bitte eine ganze Zahl von 1 bis 999 eingeben.");
+          if (!valid) {
+            if (report) input.reportValidity();
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    function validBottle(bottle) {
+      return bottle && typeof bottle.id === "string" && typeof bottle.name === "string"
+        && bottle.name.trim().length > 0 && bottle.name.length <= 80
+        && statKeys.every(stat => Number.isSafeInteger(bottle[stat]) && bottle[stat] >= (stat === "hp" ? 1 : 0));
+    }
+
+    function parseBottleData(raw) {
+      try {
+        const data = JSON.parse(raw);
+        if (data && Number.isSafeInteger(data.revision) && Array.isArray(data.bottles)) {
+          return { revision: data.revision, bottles: data.bottles.filter(validBottle) };
+        }
+      } catch (_) { /* Ignore damaged or unrelated browser data. */ }
+      return { revision: 0, bottles: [] };
+    }
+
+    function readBottleCookie() {
+      try {
+        const value = document.cookie.split("; ").find(item => item.startsWith(bottleCookieName + "="));
+        return value ? decodeURIComponent(value.slice(bottleCookieName.length + 1)) : null;
+      } catch (_) { return null; }
+    }
+
+    function readSavedBottles() {
+      let local = null;
+      try { local = localStorage.getItem(bottleStorageKey); } catch (_) { /* Cookies may still work. */ }
+      const candidates = [parseBottleData(local), parseBottleData(readBottleCookie())];
+      const data = candidates.sort((a, b) => b.revision - a.revision)[0];
+      bottleRevision = data.revision;
+      return data.bottles;
+    }
+
+    let savedBottles = readSavedBottles();
+
+    function persistBottles(next) {
+      const revision = Math.max(Date.now(), bottleRevision + 1);
+      const raw = JSON.stringify({ revision, bottles: next });
+      let stored = false;
+      try {
+        localStorage.setItem(bottleStorageKey, raw);
+        stored = localStorage.getItem(bottleStorageKey) === raw;
+      } catch (_) { /* Fall back to the cookie if browser storage is unavailable. */ }
+      const encoded = encodeURIComponent(raw);
+      // Keep the cookie below browser limits; large libraries use localStorage.
+      // Both copies carry a revision, so a stale fallback never wins on reload.
+      if (encoded.length < 3500) {
+        try {
+          document.cookie = `${bottleCookieName}=${encoded}; Max-Age=34560000; Path=/flasche; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+          stored = readBottleCookie() === raw || stored;
+        } catch (_) { /* Surface a failure only when neither store succeeds. */ }
+      }
+      if (!stored) {
+        document.getElementById("saveStatus").textContent = "Speichern fehlgeschlagen: Browserspeicher ist voll oder blockiert. Bitte Speicher freigeben oder Cookies/Browserspeicher erlauben.";
+        return false;
+      }
+      savedBottles = next;
+      bottleRevision = revision;
+      renderSavedBottles();
+      return true;
+    }
+
+    function updateSaveButton(player) {
+      const input = document.getElementById("bottleName" + player);
+      const hasName = input.value.trim().length > 0;
+      input.setCustomValidity(hasName ? "" : "Name fehlt");
+      const button = document.getElementById("saveBottle" + player);
+      button.setAttribute("data-needs-name", String(!hasName));
+      button.title = hasName ? `${player === 1 ? "Spieler" : "Gegner"}-Flasche speichern` : "Name fehlt";
+    }
+
+    function saveBottle(player) {
+      const nameInput = document.getElementById("bottleName" + player);
+      updateSaveButton(player);
+      if (!nameInput.reportValidity() || !validateFighters([player])) return;
+      const name = nameInput.value.trim();
+      const existingIndex = savedBottles.findIndex(item => item.name === name);
+      const bottle = {
+        id: existingIndex >= 0 ? savedBottles[existingIndex].id : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name
+      };
+      for (const stat of statKeys) bottle[stat] = getNumber(stat + player);
+      // Keep the original position and replace any older duplicates of this name.
+      const next = savedBottles.filter(item => item.name !== name);
+      if (existingIndex >= 0) next.splice(existingIndex, 0, bottle);
+      else next.push(bottle);
+      if (persistBottles(next)) {
+        nameInput.value = name;
+        document.getElementById("saveStatus").textContent = `„${name}“ ${existingIndex >= 0 ? "aktualisiert" : "gespeichert"}.`;
+      }
+    }
+
+    function loadBottle(id, player) {
+      const bottle = savedBottles.find(item => item.id === id);
+      if (!bottle) return;
+      const adjusted = statKeys.some(stat => bottle[stat] < 1 || bottle[stat] > 999);
+      for (const stat of statKeys) setNumber(stat + player, Math.max(1, Math.min(999, bottle[stat])));
+      document.getElementById("bottleName" + player).value = bottle.name;
+      updateSaveButton(player);
+      fighterValuesChanged();
+      document.getElementById("saveStatus").textContent = `„${bottle.name}“ als ${player === 1 ? "Spieler" : "Gegner"} geladen.${adjusted ? " Ältere Werte wurden auf 1 bis 999 angepasst." : ""}`;
+    }
+
+    function renderSavedBottles() {
+      document.getElementById("savedBottleCount").textContent = savedBottles.length;
+      document.getElementById("emptyBottleLibrary").hidden = savedBottles.length > 0;
+      document.getElementById("savedBottleTable").hidden = savedBottles.length === 0;
+      const list = document.getElementById("savedBottles");
+      list.replaceChildren();
+      for (const bottle of savedBottles) {
+        const row = document.createElement("tr");
+        const name = document.createElement("th");
+        name.scope = "row";
+        name.className = "bottle-name";
+        name.textContent = bottle.name;
+        row.append(name);
+        const stats = document.createElement("td");
+        stats.className = "bottle-stats";
+        for (const group of [
+          [["HP", "HP", bottle.hp], ["Ang", "Angriff", bottle.atk], ["Ver", "Verteidigung", bottle.def]],
+          [["Aus", "Ausweichen", bottle.eva], ["Ges", "Geschwindigkeit", bottle.spd], ["Krit", "Kritisch", bottle.crit]]
+        ]) {
+          const line = document.createElement("span");
+          line.className = "stat-line";
+          group.forEach(([short, label, value], index) => {
+            if (index) line.append(document.createTextNode(" · "));
+            const stat = document.createElement("abbr");
+            stat.title = label;
+            stat.setAttribute("aria-label", `${label}: ${value}`);
+            stat.textContent = `${short} ${value}`;
+            line.append(stat);
+          });
+          stats.append(line);
+        }
+        row.append(stats);
+        function addIconButton(icon, label, action, className = "") {
+          const cell = document.createElement("td");
+          cell.className = "icon-cell";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `icon-button ${className}`;
+          button.title = label;
+          button.setAttribute("aria-label", label);
+          const symbol = document.createElement("span");
+          symbol.setAttribute("aria-hidden", "true");
+          symbol.textContent = icon;
+          button.append(symbol);
+          button.addEventListener("click", action);
+          cell.append(button);
+          row.append(cell);
+        }
+        addIconButton("👤", `„${bottle.name}“ als Spieler laden`, () => loadBottle(bottle.id, 1));
+        addIconButton("👹", `„${bottle.name}“ als Gegner laden`, () => loadBottle(bottle.id, 2));
+        addIconButton("🗑️", `„${bottle.name}“ löschen`, () => {
+          if (persistBottles(savedBottles.filter(item => item.id !== bottle.id))) {
+            document.getElementById("saveStatus").textContent = `„${bottle.name}“ gelöscht.`;
+          }
+        }, "delete");
+        list.append(row);
+      }
+    }
+
+    function fighterValuesChanged() {
+      lastCalculation = null;
+      updateCalculatedStats();
+      scheduleFightCalculation();
+      const suggestionOutput = document.getElementById("suggestions");
+      if (suggestionOutput) suggestionOutput.textContent = "Werte geändert. Vorschläge bei Bedarf neu berechnen.";
+      for (const id of Object.keys(savedSuggestions)) delete savedSuggestions[id];
+    }
+
+    for (const player of [1, 2]) {
+      const nameInput = document.getElementById("bottleName" + player);
+      nameInput.addEventListener("input", () => {
+        updateSaveButton(player);
+        scheduleFightCalculation();
+      });
+      updateSaveButton(player);
+      for (const stat of statKeys) {
+        document.getElementById(stat + player).addEventListener("input", fighterValuesChanged);
+      }
+    }
+    let survivalResizeTimer;
+    window.addEventListener("resize", () => {
+      clearTimeout(survivalResizeTimer);
+      survivalResizeTimer = setTimeout(() => {
+        if (document.getElementById("survivalDistribution")) renderSurvivalDistribution();
+      }, 150);
+    });
+    window.addEventListener("storage", event => {
+      if (event.key === bottleStorageKey || event.key === null) {
+        savedBottles = readSavedBottles();
+        renderSavedBottles();
+      }
+    });
+    const bottleLibrary = document.getElementById("bottleLibrary");
+    const libraryOpenCookie = "flasche_library_open";
+    try {
+      bottleLibrary.open = document.cookie.split(";").some(cookie => cookie.trim() === `${libraryOpenCookie}=open`);
+    } catch (_) { /* Leave the library folded if cookies are unavailable. */ }
+    bottleLibrary.addEventListener("toggle", () => {
+      try {
+        document.cookie = `${libraryOpenCookie}=${bottleLibrary.open ? "open" : "closed"}; Max-Age=34560000; Path=/flasche; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+      } catch (_) { /* Folding still works when cookies are blocked. */ }
+    });
+
+    const realFightFields = [
+      ["realRounds", "rounds", 1, null],
+      ["realEvaded1", "player_evaded_hits", 0, 1000],
+      ["realEvaded2", "enemy_evaded_hits", 0, 1000],
+      ["realCritical1", "player_critical_hits", 0, 1000],
+      ["realCritical2", "enemy_critical_hits", 0, 1000],
+      ["realDouble1", "player_double_hits", 0, 1000],
+      ["realDouble2", "enemy_double_hits", 0, 1000]
+    ];
+    const fightSubmissionUrl = "https://dodhkgmedobuwxemhrnh.supabase.co/rest/v1/fight_logs";
+    const fightSubmissionKey = "sb_publishable_wFt0kFKtjHu4rhxFeeEWkg_Hag_YARI";
+    let lastSubmittedRealFight = null;
+    let realFightSubmitting = false;
+
+    function showRealFightStatus(message, isError = false) {
+      const status = document.getElementById("realFightStatus");
+      status.textContent = message;
+      status.hidden = message === "";
+      status.style.color = isError ? "#b42318" : "#28704f";
+    }
+
+    function readRealFightData(reportErrors = false) {
+      const data = {};
+      for (const [id, column, minimum, maximum] of realFightFields) {
+        const input = document.getElementById(id);
+        const raw = input.value.trim();
+        const value = raw === "" ? null : Number(raw);
+        const valid = !input.validity.badInput && (value === null ||
+          (Number.isSafeInteger(value) && value >= minimum && (maximum === null || value <= maximum)));
+        input.setCustomValidity(valid ? "" : maximum === null
+          ? "Bitte N/A (leer) oder eine ganze Zahl ab 1 eingeben."
+          : "Bitte N/A (leer) oder eine ganze Zahl von 0 bis 1000 eingeben.");
+        if (!valid) {
+          if (reportErrors) input.reportValidity();
+          return null;
+        }
+        data[column] = value;
+      }
+      if (Object.values(data).every(value => value === null)) {
+        const input = document.getElementById("realRounds");
+        input.setCustomValidity("Bitte mindestens einen beobachteten Kampfwert eingeben.");
+        if (reportErrors) input.reportValidity();
+        return null;
+      }
+      return data;
+    }
+
+    function updateRealFightSubmitState() {
+      const data = readRealFightData();
+      const unchanged = data !== null && JSON.stringify(data) === lastSubmittedRealFight;
+      const button = document.getElementById("submitRealFight");
+      button.disabled = realFightSubmitting || unchanged;
+      button.textContent = realFightSubmitting ? "Wird gesendet…" : "Submit";
+      button.title = button.disabled ? "" : "Kampfdaten absenden";
+      button.setAttribute("aria-busy", String(realFightSubmitting));
+    }
+
+    function buildFightSubmission(p1, p2, observations) {
+      const data = {};
+      const statColumns = { hp: "hp", atk: "attack", def: "defense", eva: "evasion", spd: "speed", crit: "critical" };
+      for (const [prefix, fighter] of [["player", p1], ["enemy", p2]]) {
+        for (const [stat, column] of Object.entries(statColumns)) {
+          const value = stat === "hp" ? fighter.maxHp : fighter[stat];
+          if (!Number.isSafeInteger(value) || value < 1 || value > 999) throw new RangeError("Ungültige Flaschenwerte.");
+          data[`${prefix}_${column}`] = value;
+        }
+      }
+      for (const [, column, minimum, maximum] of realFightFields) {
+        const value = observations[column];
+        if (value !== null && (!Number.isSafeInteger(value) || value < minimum || (maximum !== null && value > maximum))) {
+          throw new RangeError("Ungültige beobachtete Kampfwerte.");
+        }
+        data[column] = value;
+      }
+      // The database generates id and submitted_at; no names or browser identifiers are sent.
+      return data;
+    }
+
+    async function submitRealFight() {
+      if (realFightSubmitting) return;
+      const observations = readRealFightData(true);
+      if (!observations) return;
+      const fingerprint = JSON.stringify(observations);
+      if (fingerprint === lastSubmittedRealFight) return;
+      if (!validateFighters()) return;
+      const { p1, p2 } = readFighters();
+      const data = buildFightSubmission(p1, p2, observations);
+      realFightSubmitting = true;
+      showRealFightStatus("Kampfdaten werden gesendet…");
+      updateRealFightSubmitState();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(fightSubmissionUrl, {
+          method: "POST",
+          headers: {
+            "apikey": fightSubmissionKey,
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+          },
+          credentials: "omit",
+          body: JSON.stringify(data),
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("Submission failed");
+        lastSubmittedRealFight = fingerprint;
+        showRealFightStatus("Kampfdaten gespeichert. Danke für deine Hilfe!");
+      } catch (error) {
+        showRealFightStatus(error.name === "AbortError"
+          ? "Keine Bestätigung erhalten. Bitte Verbindung prüfen und erneut versuchen."
+          : "Kampfdaten konnten nicht gespeichert werden. Bitte erneut versuchen.", true);
+      } finally {
+        clearTimeout(timeout);
+        realFightSubmitting = false;
+        updateRealFightSubmitState();
+      }
+    }
+
+    for (const [id] of realFightFields) {
+      document.getElementById(id).addEventListener("input", () => {
+        if (!realFightSubmitting) showRealFightStatus("");
+        updateRealFightSubmitState();
+      });
+    }
+    document.getElementById("submitRealFight").addEventListener("click", submitRealFight);
+    updateRealFightSubmitState();
+
+    renderSavedBottles();
+    updateCalculatedStats();
+    calculateFight();
+
   </script>
 </body>
 </html>
