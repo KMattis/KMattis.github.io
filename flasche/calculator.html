@@ -139,6 +139,12 @@
     .combat-table thead th:first-child { width: 56%; }
     .combat-table tbody th { font-weight: 500; }
     .combat-table tbody td { vertical-align: middle; }
+    .enemy-health { display: flex; align-items: center; gap: 5px 8px; flex-wrap: wrap; }
+    .enemy-health #hp2 { flex: 1 1 55px; width: 55px; }
+    .boss-option { display: inline-flex; align-items: center; gap: 4px; margin: 0; font-size: 11px; white-space: nowrap; }
+    .fighter-table .boss-option input { width: auto; margin: 0; padding: 0; accent-color: #267047; }
+    .enemy-health #hp2:disabled { color: #267047; background: #f1f5f2; opacity: 1; }
+    .boss-badge { display: block; color: #267047; font-size: 11px; font-weight: 500; margin-top: 3px; }
     .calculated-value { font-weight: 600; color: #267047; font-variant-numeric: tabular-nums; }
     .stat-note { display: block; margin-top: 3px; color: #666; font-size: 11px; font-weight: 400; line-height: 1.35; }
     .fighter-table input, .real-rounds input { margin: 0; padding: 7px 8px; min-width: 0; border: 1px solid #d5d5d5; border-radius: 6px; font: inherit; background: #fff; }
@@ -278,7 +284,8 @@
             <tr>
               <th scope="row">HP</th>
               <td><input id="hp1" type="number" value="100" min="1" max="999" step="1" aria-label="HP – Spieler"></td>
-              <td><input id="hp2" type="number" value="100" min="1" max="999" step="1" aria-label="HP – Gegner"></td>
+              <td><div class="enemy-health"><input id="hp2" type="number" value="100" min="1" max="999" step="1" aria-label="HP – Gegner">
+                <label class="boss-option"><input id="enemyTreppenboss" type="checkbox">Treppenboss</label></div></td>
             </tr>
             <tr>
               <th scope="row">Angriff</th>
@@ -292,18 +299,18 @@
             </tr>
             <tr>
               <th scope="row">Ausweichen<span id="evasionNote" class="stat-note">Formel noch nicht optimal.</span></th>
-              <td><input id="eva1" aria-describedby="evasionNote" type="number" value="23" min="1" max="999" step="1" aria-label="Ausweichen – Spieler"></td>
-              <td><input id="eva2" aria-describedby="evasionNote" type="number" value="23" min="1" max="999" step="1" aria-label="Ausweichen – Gegner"></td>
+              <td><input id="eva1" aria-describedby="evasionNote" type="number" value="23" min="0" max="999" step="1" aria-label="Ausweichen – Spieler"></td>
+              <td><input id="eva2" aria-describedby="evasionNote" type="number" value="23" min="0" max="999" step="1" aria-label="Ausweichen – Gegner"></td>
             </tr>
             <tr>
               <th scope="row">Geschwindigkeit<span id="speedNote" class="stat-note">Noch keine Doppeltreffer, nur Reihenfolge.</span></th>
-              <td><input id="spd1" aria-describedby="speedNote" type="number" value="10" min="1" max="999" step="1" aria-label="Geschwindigkeit – Spieler"></td>
-              <td><input id="spd2" aria-describedby="speedNote" type="number" value="10" min="1" max="999" step="1" aria-label="Geschwindigkeit – Gegner"></td>
+              <td><input id="spd1" aria-describedby="speedNote" type="number" value="10" min="0" max="999" step="1" aria-label="Geschwindigkeit – Spieler"></td>
+              <td><input id="spd2" aria-describedby="speedNote" type="number" value="10" min="0" max="999" step="1" aria-label="Geschwindigkeit – Gegner"></td>
             </tr>
             <tr>
               <th scope="row">Kritisch<span id="criticalNote" class="stat-note">Noch nicht in der Kampfberechnung verwendet.</span></th>
-              <td><input id="crit1" aria-describedby="criticalNote" type="number" value="1" min="1" max="999" step="1" aria-label="Kritisch – Spieler"></td>
-              <td><input id="crit2" aria-describedby="criticalNote" type="number" value="1" min="1" max="999" step="1" aria-label="Kritisch – Gegner"></td>
+              <td><input id="crit1" aria-describedby="criticalNote" type="number" value="1" min="0" max="999" step="1" aria-label="Kritisch – Spieler"></td>
+              <td><input id="crit2" aria-describedby="criticalNote" type="number" value="1" min="0" max="999" step="1" aria-label="Kritisch – Gegner"></td>
             </tr>
         </tbody>
       </table>
@@ -442,6 +449,24 @@
       document.getElementById(id).value = value;
     }
 
+    let enemyRegularHp = document.getElementById("hp2").value;
+
+    function syncEnemyHealth() {
+      const input = document.getElementById("hp2");
+      const isBoss = document.getElementById("enemyTreppenboss").checked;
+      if (isBoss) {
+        if (input.type === "number") enemyRegularHp = input.value;
+        input.type = "text";
+        input.value = "∞";
+        input.disabled = true;
+      } else {
+        if (input.disabled) input.value = enemyRegularHp;
+        input.type = "number";
+        input.disabled = false;
+      }
+      input.setCustomValidity("");
+    }
+
     function readFighters() {
       const p1 = {
         name: "Spieler",
@@ -456,8 +481,9 @@
 
       const p2 = {
         name: "Gegner",
-        hp: getNumber("hp2"),
-        maxHp: getNumber("hp2"),
+        isTreppenboss: document.getElementById("enemyTreppenboss").checked,
+        hp: document.getElementById("enemyTreppenboss").checked ? Infinity : getNumber("hp2"),
+        maxHp: document.getElementById("enemyTreppenboss").checked ? Infinity : getNumber("hp2"),
         atk: getNumber("atk2"),
         def: getNumber("def2"),
         eva: getNumber("eva2"),
@@ -466,6 +492,48 @@
       };
 
       return { p1, p2 };
+    }
+
+    function calculateTreppenbossCombat(player, boss) {
+      const playerDamage = damage(player.atk, boss.def);
+      const bossDamage = damage(boss.atk, player.def);
+      const playerHitChance = 270 / (boss.eva + 270);
+      const bossHitChance = 270 / (player.eva + 270);
+      const hitsUntilDefeat = bossDamage > 0 ? Math.ceil(player.maxHp / bossDamage) : Infinity;
+      const avgRounds = hitsUntilDefeat / bossHitChance;
+      // If the boss starts, its final lethal attack prevents our last attack.
+      const avgAttacks = avgRounds - (player.spd < boss.spd ? 1 : 0);
+      const avgLandedHits = avgAttacks * playerHitChance;
+      const avgDamage = playerDamage === 0 ? 0 : avgLandedHits * playerDamage;
+      return { mode: "treppenboss", avgDamage, avgRounds, avgAttacks, avgLandedHits, hitsUntilDefeat, playerDamage, bossDamage, playerHitChance, bossHitChance };
+    }
+
+    function treppenbossResultHtml(player, boss, result) {
+      return `${calculationHeaderHtml("Berechnung abgeschlossen")}
+        <section aria-label="Erwarteter Schaden gegen den Treppenboss">
+          <h3>Schaden gegen den Treppenboss</h3>
+          <p class="muted">Der Gegner hat unendlich HP. Berechnet wird dein gesamter Schaden bis zur Niederlage.</p>
+          <div class="outcome-card"><div class="win-chance">${formatReserve(result.avgDamage)}</div>
+            <p class="muted">Ø Gesamtschaden am Treppenboss</p></div>
+          <div class="outcome-cards">
+            <div class="outcome-card"><div class="reserve-value">${formatReserve(result.avgRounds)}</div><p class="muted">Ø Runden bis zur Niederlage</p></div>
+            <div class="outcome-card"><div class="reserve-value">${formatReserve(result.avgLandedHits)}</div><p class="muted">Ø gelandete Treffer</p></div>
+          </div>
+          ${result.bossDamage === 0 ? '<p class="muted">Der Treppenboss verursacht mit der aktuellen Formel keinen Schaden. Der Kampf endet nicht; ∞ steht für einen unbegrenzten Erwartungswert.</p>' : ""}
+          <p class="muted">Die Ausweichchancen und die Angriffsreihenfolge sind berücksichtigt. Kritische Treffer und Doppeltreffer sind noch nicht enthalten.</p>
+        </section>
+        <details class="reserve-explanation calculation-details">
+          <summary>Verwendete Formeln und Werte</summary>
+          <ul class="formula-list">
+            <li><strong>HP:</strong> Spieler ${player.maxHp}, Treppenboss ∞.</li>
+            <li><strong>Grundschaden:</strong> round(Angriff × 15 / (15 + gegnerische Verteidigung)). Spieler ${result.playerDamage}, Treppenboss ${result.bossDamage}.</li>
+            <li><strong>Trefferchance:</strong> 270 / (Ausweichen des Verteidigers + 270). Spieler ${percent(result.playerHitChance)}, Treppenboss ${percent(result.bossHitChance)}.</li>
+            <li><strong>Treffer bis zur Niederlage:</strong> ceil(Spieler-HP / Boss-Grundschaden) = ${formatReserve(result.hitsUntilDefeat, 0)}.</li>
+            <li><strong>Ø Runden:</strong> Treffer bis zur Niederlage / Boss-Trefferchance.</li>
+            <li><strong>Ø eigene Angriffe:</strong> Ø Runden${player.spd < boss.spd ? " − 1, da der Treppenboss zuerst angreift" : ", da der Spieler zuerst angreift (auch bei gleicher Geschwindigkeit)"}.</li>
+            <li><strong>Ø Gesamtschaden:</strong> Ø eigene Angriffe × Spieler-Trefferchance × Spieler-Grundschaden.</li>
+          </ul>
+        </details>`;
     }
 
     function calculateExactCombat(p1, p2) {
@@ -595,11 +663,18 @@
       const panel = document.getElementById("result");
       if (!validateFighters([1, 2], reportErrors)) {
         lastCalculation = null;
-        panel.innerHTML = calculationHeaderHtml("Werte prüfen") + '<p class="muted">Bitte für alle sechs Kampfwerte ganze Zahlen von 1 bis 999 eingeben.</p>';
+        panel.innerHTML = calculationHeaderHtml("Werte prüfen") + '<p class="muted">HP, Angriff und Verteidigung: 1–999. Ausweichen, Geschwindigkeit und Kritisch: 0–999. Treppenboss-HP sind unendlich.</p>';
         return;
       }
       const { p1, p2 } = readFighters();
       const detailsOpen = panel.querySelector(".calculation-details")?.open || false;
+      if (p2.isTreppenboss) {
+        lastCalculation = calculateTreppenbossCombat(p1, p2);
+        updateCalculatedStats();
+        panel.innerHTML = treppenbossResultHtml(p1, p2, lastCalculation);
+        if (detailsOpen) panel.querySelector(".calculation-details").open = true;
+        return;
+      }
       try {
         lastCalculation = calculateExactCombat(p1, p2);
       } catch (error) {
@@ -972,6 +1047,7 @@
       if (suggestionOutput) suggestionOutput.innerHTML = html;
     }
     const statKeys = ["hp", "atk", "def", "eva", "spd", "crit"];
+    const statMinimum = stat => ["eva", "spd", "crit"].includes(stat) ? 0 : 1;
     const bottleStorageKey = "flasche.savedBottles.v1";
     const bottleCookieName = "flasche_bottles_v1";
     let bottleRevision = 0;
@@ -980,9 +1056,14 @@
       for (const player of players) {
         for (const stat of statKeys) {
           const input = document.getElementById(stat + player);
+          if (player === 2 && stat === "hp" && document.getElementById("enemyTreppenboss").checked) {
+            input.setCustomValidity("");
+            continue;
+          }
           const value = Number(input.value);
-          const valid = input.value.trim() !== "" && Number.isSafeInteger(value) && value >= 1 && value < 1000;
-          input.setCustomValidity(valid ? "" : "Bitte eine ganze Zahl von 1 bis 999 eingeben.");
+          const minimum = statMinimum(stat);
+          const valid = input.value.trim() !== "" && Number.isSafeInteger(value) && value >= minimum && value < 1000;
+          input.setCustomValidity(valid ? "" : `Bitte eine ganze Zahl von ${minimum} bis 999 eingeben.`);
           if (!valid) {
             if (report) input.reportValidity();
             return false;
@@ -995,14 +1076,17 @@
     function validBottle(bottle) {
       return bottle && typeof bottle.id === "string" && typeof bottle.name === "string"
         && bottle.name.trim().length > 0 && bottle.name.length <= 80
-        && statKeys.every(stat => Number.isSafeInteger(bottle[stat]) && bottle[stat] >= (stat === "hp" ? 1 : 0));
+        && (bottle.isTreppenboss === undefined || typeof bottle.isTreppenboss === "boolean")
+        && statKeys.every(stat => stat === "hp" && bottle.isTreppenboss === true
+          ? bottle.hp === null || bottle.hp === "N/A"
+          : Number.isSafeInteger(bottle[stat]) && bottle[stat] >= (stat === "hp" ? 1 : 0));
     }
 
     function parseBottleData(raw) {
       try {
         const data = JSON.parse(raw);
         if (data && Number.isSafeInteger(data.revision) && Array.isArray(data.bottles)) {
-          return { revision: data.revision, bottles: data.bottles.filter(validBottle) };
+          return { revision: data.revision, bottles: data.bottles.filter(validBottle).map(bottle => ({ ...bottle, isTreppenboss: bottle.isTreppenboss === true })) };
         }
       } catch (_) { /* Ignore damaged or unrelated browser data. */ }
       return { revision: 0, bottles: [] };
@@ -1070,9 +1154,10 @@
       const existingIndex = savedBottles.findIndex(item => item.name === name);
       const bottle = {
         id: existingIndex >= 0 ? savedBottles[existingIndex].id : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name
+        name,
+        isTreppenboss: player === 2 && document.getElementById("enemyTreppenboss").checked
       };
-      for (const stat of statKeys) bottle[stat] = getNumber(stat + player);
+      for (const stat of statKeys) bottle[stat] = stat === "hp" && bottle.isTreppenboss ? null : getNumber(stat + player);
       // Keep the original position and replace any older duplicates of this name.
       const next = savedBottles.filter(item => item.name !== name);
       if (existingIndex >= 0) next.splice(existingIndex, 0, bottle);
@@ -1086,12 +1171,23 @@
     function loadBottle(id, player) {
       const bottle = savedBottles.find(item => item.id === id);
       if (!bottle) return;
-      const adjusted = statKeys.some(stat => bottle[stat] < 1 || bottle[stat] > 999);
-      for (const stat of statKeys) setNumber(stat + player, Math.max(1, Math.min(999, bottle[stat])));
+      if (bottle.isTreppenboss && player === 1) {
+        document.getElementById("saveStatus").textContent = "Treppenbosse können nur als Gegner geladen werden.";
+        return;
+      }
+      if (player === 2) {
+        document.getElementById("enemyTreppenboss").checked = bottle.isTreppenboss === true;
+        syncEnemyHealth();
+      }
+      const adjusted = statKeys.some(stat => !(stat === "hp" && bottle.isTreppenboss) && (bottle[stat] < statMinimum(stat) || bottle[stat] > 999));
+      for (const stat of statKeys) {
+        if (stat === "hp" && bottle.isTreppenboss) continue;
+        setNumber(stat + player, Math.max(statMinimum(stat), Math.min(999, bottle[stat])));
+      }
       document.getElementById("bottleName" + player).value = bottle.name;
       updateSaveButton(player);
       fighterValuesChanged();
-      document.getElementById("saveStatus").textContent = `„${bottle.name}“ als ${player === 1 ? "Spieler" : "Gegner"} geladen.${adjusted ? " Ältere Werte wurden auf 1 bis 999 angepasst." : ""}`;
+      document.getElementById("saveStatus").textContent = `„${bottle.name}“ als ${player === 1 ? "Spieler" : "Gegner"} geladen.${adjusted ? " Ältere Werte wurden an die erlaubten Grenzen angepasst." : ""}`;
     }
 
     function renderSavedBottles() {
@@ -1106,11 +1202,17 @@
         name.scope = "row";
         name.className = "bottle-name";
         name.textContent = bottle.name;
+        if (bottle.isTreppenboss) {
+          const badge = document.createElement("span");
+          badge.className = "boss-badge";
+          badge.textContent = "Treppenboss";
+          name.append(badge);
+        }
         row.append(name);
         const stats = document.createElement("td");
         stats.className = "bottle-stats";
         for (const group of [
-          [["HP", "HP", bottle.hp], ["Ang", "Angriff", bottle.atk], ["Ver", "Verteidigung", bottle.def]],
+          [["HP", "HP", bottle.isTreppenboss ? "∞" : bottle.hp], ["Ang", "Angriff", bottle.atk], ["Ver", "Verteidigung", bottle.def]],
           [["Aus", "Ausweichen", bottle.eva], ["Ges", "Geschwindigkeit", bottle.spd], ["Krit", "Kritisch", bottle.crit]]
         ]) {
           const line = document.createElement("span");
@@ -1126,11 +1228,12 @@
           stats.append(line);
         }
         row.append(stats);
-        function addIconButton(icon, label, action, className = "") {
+        function addIconButton(icon, label, action, className = "", disabled = false) {
           const cell = document.createElement("td");
           cell.className = "icon-cell";
           const button = document.createElement("button");
           button.type = "button";
+          button.disabled = disabled;
           button.className = `icon-button ${className}`;
           button.title = label;
           button.setAttribute("aria-label", label);
@@ -1142,7 +1245,7 @@
           cell.append(button);
           row.append(cell);
         }
-        addIconButton("👤", `„${bottle.name}“ als Spieler laden`, () => loadBottle(bottle.id, 1));
+        addIconButton("👤", bottle.isTreppenboss ? "Treppenbosse können nur als Gegner geladen werden" : `„${bottle.name}“ als Spieler laden`, () => loadBottle(bottle.id, 1), "", bottle.isTreppenboss);
         addIconButton("👹", `„${bottle.name}“ als Gegner laden`, () => loadBottle(bottle.id, 2));
         addIconButton("🗑️", `„${bottle.name}“ löschen`, () => {
           if (persistBottles(savedBottles.filter(item => item.id !== bottle.id))) {
@@ -1173,6 +1276,10 @@
         document.getElementById(stat + player).addEventListener("input", fighterValuesChanged);
       }
     }
+    document.getElementById("enemyTreppenboss").addEventListener("change", () => {
+      syncEnemyHealth();
+      fighterValuesChanged();
+    });
     let survivalResizeTimer;
     window.addEventListener("resize", () => {
       clearTimeout(survivalResizeTimer);
@@ -1259,8 +1366,10 @@
       const statColumns = { hp: "hp", atk: "attack", def: "defense", eva: "evasion", spd: "speed", crit: "critical" };
       for (const [prefix, fighter] of [["player", p1], ["enemy", p2]]) {
         for (const [stat, column] of Object.entries(statColumns)) {
-          const value = stat === "hp" ? fighter.maxHp : fighter[stat];
-          if (!Number.isSafeInteger(value) || value < 1 || value > 999) throw new RangeError("Ungültige Flaschenwerte.");
+          // 1,000,000 is the database marker for an enemy with infinite HP.
+          const isBossHp = prefix === "enemy" && stat === "hp" && fighter.isTreppenboss === true;
+          const value = isBossHp ? 1000000 : stat === "hp" ? fighter.maxHp : fighter[stat];
+          if (!Number.isSafeInteger(value) || value < statMinimum(stat) || (!isBossHp && value > 999)) throw new RangeError("Ungültige Flaschenwerte.");
           data[`${prefix}_${column}`] = value;
         }
       }
@@ -1324,6 +1433,12 @@
     document.getElementById("submitRealFight").addEventListener("click", submitRealFight);
     updateRealFightSubmitState();
 
+    // Seed on page open only when the saved library is empty, including returning visitors.
+    if (savedBottles.length === 0) {
+      const nito = { id: "preset-nito", name: "Knochenkönig Nito", isTreppenboss: true, hp: null, atk: 35, def: 35, eva: 50, spd: 0, crit: 50 };
+      if (!persistBottles([nito])) savedBottles = [nito];
+    }
+    syncEnemyHealth();
     renderSavedBottles();
     updateCalculatedStats();
     calculateFight();
