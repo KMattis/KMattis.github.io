@@ -126,7 +126,7 @@
     #realFight h2 { margin-top: 0; }
     #realFight { margin-top: 16px; }
     #realFight h2 { font-size: 18px; margin-bottom: 8px; }
-    .real-fight-table { max-width: 620px; }
+    .real-fight-table, .real-fight-examples { max-width: 620px; }
     .real-fight-table thead th:first-child { width: 42%; }
     .table-scroll { overflow-x: auto; }
     .compact-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
@@ -364,7 +364,8 @@
     <h2 id="realFightTitle">Echter Kampf</h2>
     <p class="muted">Flaschenwerte oben eintragen, beobachtete Treffer hier ergänzen. Unbekannte Werte leer lassen (N/A); 0 bedeutet, dass kein solcher Treffer vorkam.</p>
     <label class="real-rounds">Anzahl Runden
-      <input id="realRounds" type="number" min="1" step="1" title="N/A oder ganze Zahl ab 1" placeholder="N/A">
+      <input id="realRounds" type="number" min="1" step="1" title="N/A oder ganze Zahl ab 1" placeholder="N/A" aria-describedby="realRoundsNote">
+      <span id="realRoundsNote" class="stat-note">Rundenzahl aus dem Kampflog.</span>
     </label>
     <table class="compact-table fighter-table real-fight-table" aria-label="Beobachtungen aus einem echten Kampf">
       <thead>
@@ -376,23 +377,33 @@
       </thead>
       <tbody>
           <tr>
-            <th scope="row">Ausgewichen</th>
-            <td><input id="realEvaded1" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Ausgewichen – Spieler im echten Kampf"></td>
-            <td><input id="realEvaded2" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Ausgewichen – Gegner im echten Kampf"></td>
+            <th scope="row">Ausgewichen<span id="realEvadedNote" class="stat-note">Vermiedene gegnerische Angriffe, auch bei Zusatzangriffen.</span></th>
+            <td><input id="realEvaded1" aria-describedby="realEvadedNote" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Ausgewichen – Spieler im echten Kampf"></td>
+            <td><input id="realEvaded2" aria-describedby="realEvadedNote" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Ausgewichen – Gegner im echten Kampf"></td>
           </tr>
           <tr>
-            <th scope="row">Kritische Treffer</th>
-            <td><input id="realCritical1" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Kritische Treffer – Spieler im echten Kampf"></td>
-            <td><input id="realCritical2" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Kritische Treffer – Gegner im echten Kampf"></td>
+            <th scope="row">Kritische Treffer<span id="realCriticalNote" class="stat-note">Eigene gelandete kritische Treffer, auch bei Zusatzangriffen.</span></th>
+            <td><input id="realCritical1" aria-describedby="realCriticalNote" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Kritische Treffer – Spieler im echten Kampf"></td>
+            <td><input id="realCritical2" aria-describedby="realCriticalNote" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Kritische Treffer – Gegner im echten Kampf"></td>
           </tr>
           <tr>
-            <th scope="row">Doppeltreffer</th>
-            <td><input id="realDouble1" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Doppeltreffer – Spieler im echten Kampf"></td>
-            <td><input id="realDouble2" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Doppeltreffer – Gegner im echten Kampf"></td>
+            <th scope="row">Doppeltreffer<span id="realDoubleNote" class="stat-note">Züge mit zwei eigenen Angriffen, auch wenn der Gegner einem oder beiden ausweicht. Pro Zug 1 zählen.</span></th>
+            <td><input id="realDouble1" aria-describedby="realDoubleNote" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Doppeltreffer – Spieler im echten Kampf"></td>
+            <td><input id="realDouble2" aria-describedby="realDoubleNote" type="number" min="0" max="1000" step="1" title="N/A oder ganze Zahl von 0 bis 1000" placeholder="N/A" aria-label="Doppeltreffer – Gegner im echten Kampf"></td>
           </tr>
       </tbody>
     </table>
-    <p class="muted">Ausgewichen zählt vermiedene gegnerische Angriffe; kritische Treffer und Doppeltreffer zählen eigene Treffer.</p>
+    <p class="muted">Ein kritischer Zusatzangriff zählt sowohl bei „Kritische Treffer“ als auch bei „Doppeltreffer“.</p>
+    <details class="reserve-explanation real-fight-examples">
+      <summary>Zwei kurze Beispiele</summary>
+      <p class="stat-note">Die Beispiele zeigen einzelne Züge. Für den ganzen Kampf die Zähler addieren.</p>
+      <ol class="formula-list">
+        <li><strong>Beide Angriffe ausgewichen:</strong> Spieler greift zweimal an, Gegner weicht beiden aus.<br>
+          → Doppeltreffer Spieler <strong>+1</strong>, Ausgewichen Gegner <strong>+2</strong>.</li>
+        <li><strong>Kritischer Zusatzangriff:</strong> Gegner landet erst einen normalen, dann einen kritischen Treffer.<br>
+          → Doppeltreffer Gegner <strong>+1</strong>, Kritische Treffer Gegner <strong>+1</strong>.</li>
+      </ol>
+    </details>
     <button id="submitRealFight" type="button">Submit</button>
     <p id="realFightStatus" class="muted" role="status" aria-live="polite" hidden></p>
   </section>
