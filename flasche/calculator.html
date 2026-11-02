@@ -217,6 +217,9 @@
     .formula-list { padding-left: 20px; font-size: 13px; line-height: 1.6; color: #595959; }
     .formula-list li { margin: 6px 0; }
     .reserve-explanation summary { cursor: pointer; color: #595959; font-size: 13px; }
+    .combat-statistics { margin-top: 14px; max-width: 620px; }
+    .combat-statistics tbody th { font-weight: 500; }
+    .combat-statistics td { text-align: right; font-variant-numeric: tabular-nums; }
     summary:focus-visible { outline: 3px solid #267047; outline-offset: 2px; }
     @media (max-width: 520px) {
       .outcome-cards { gap: 8px; }
@@ -479,7 +482,13 @@
         expectedDamagePerAttack: hit * ((1 - crit) * baseDamage + crit * critDamage) };
     }
 
-    function survivalTurnExpectations(maxHp, profile) {
+    function expectedTurnAttempts(profile, targetHp) {
+      const primaryKill = profile.hit * ((profile.baseDamage >= targetHp ? 1 - profile.crit : 0)
+        + (profile.critDamage >= targetHp ? profile.crit : 0));
+      return 1 + profile.extra * (1 - primaryKill);
+    }
+
+    function survivalTurnExpectations(maxHp, profile, countAttacks = false) {
       const turns = new Float64Array(maxHp + 1);
       const progress = 1 - profile.miss;
       if (profile.unit === 0) {
@@ -487,7 +496,7 @@
         return turns;
       }
       for (let hp = 1; hp <= maxHp; hp++) {
-        let expectation = 1;
+        let expectation = countAttacks ? expectedTurnAttempts(profile, hp) : 1;
         for (const outcome of profile.outcomes) {
           if (outcome.damage > 0 && outcome.damage < hp) {
             expectation += outcome.probability * turns[hp - outcome.damage];
@@ -496,6 +505,32 @@
         turns[hp] = expectation / progress;
       }
       return turns;
+    }
+
+    function combatStatistics(playerProfile, enemyProfile, avgRounds, playerTurns, enemyTurns, playerAttacks, enemyAttacks) {
+      const scale = (count, rate) => rate === 0 ? 0 : count * rate;
+      const side = (profile, other, turns, attacks, otherAttacks) => {
+        const totalDamage = scale(attacks, profile.expectedDamagePerAttack);
+        return { turns, attacks, totalDamage,
+          damagePerRound: Number.isFinite(avgRounds) ? totalDamage / avgRounds : (1 + profile.extra) * profile.expectedDamagePerAttack,
+          criticalHits: scale(attacks, profile.hit * profile.crit),
+          evadedAttacks: scale(otherAttacks, 1 - other.hit),
+          doubleAttacks: Number.isFinite(attacks) ? Math.max(0, attacks - turns) : profile.extra > 0 ? Infinity : 0 };
+      };
+      return { player: side(playerProfile, enemyProfile, playerTurns, playerAttacks, enemyAttacks),
+        enemy: side(enemyProfile, playerProfile, enemyTurns, enemyAttacks, playerAttacks) };
+    }
+
+    function combatStatisticsHtml(statistics) {
+      const rows = [["Ø Schaden pro Runde", "damagePerRound"], ["Ø kritische Treffer", "criticalHits"],
+        ["Ø ausgewichene Angriffe", "evadedAttacks"], ["Ø Zusatzangriffe", "doubleAttacks"]];
+      return `<details class="reserve-explanation combat-statistics"><summary>Weitere Kampfstatistiken</summary>
+        <p class="stat-note">Schaden pro Runde = erwarteter Gesamtschaden / erwartete Rundenzahl. Die Ereigniszahlen gelten für den gesamten Kampf. Zusatzangriffe zählen auch, wenn der Gegner ausweicht. Auch beim letzten Treffer zählt der volle Schaden.</p>
+        <div class="table-scroll"><table class="compact-table" aria-label="Erwartete Kampfstatistiken für Spieler und Gegner">
+          <thead><tr><th scope="col">Wert</th><th scope="col">Spieler</th><th scope="col">Gegner</th></tr></thead>
+          <tbody>${rows.map(([label, key]) => `<tr><th scope="row">${label}</th><td>${formatReserve(statistics.player[key], 2)}</td><td>${formatReserve(statistics.enemy[key], 2)}</td></tr>`).join("")}</tbody>
+        </table></div>
+      </details>`;
     }
 
     function percent(x) {
@@ -555,7 +590,136 @@
       return { p1, p2 };
     }
 
-    function calculateTreppenbossCombat(player, boss) {
+    function bossDamageDistribution(playerHp, playerProfile, bossProfile, playerFirst) {
+      if (!bossProfile.unit) return { status: "no_defeat", unbounded: playerProfile.unit > 0 };
+      if (!playerProfile.unit) return { status: "finite", outcomes: [{ damage: 0, probability: 1 }], tailFrom: null, tailProbability: 0 };
+      // States are ordered by total damage dealt, then damage received. Every
+      // non-self transition increases that order, so completed damage amounts
+      // are exact even if the remaining upper tail is grouped into one bin.
+      const hpStates = Math.ceil(playerHp / bossProfile.unit);
+      const pending = new Map(), heap = [], completed = new Map();
+      const push = (incoming, amount, probability) => {
+        if (!(probability > 0)) return;
+        const key = amount * hpStates + incoming;
+        const existing = pending.get(key);
+        if (existing) { existing.probability += probability; return; }
+        const node = { key, incoming, damage: amount, probability };
+        pending.set(key, node);
+        let index = heap.length;
+        heap.push(node);
+        while (index > 0) {
+          const parent = (index - 1) >> 1;
+          if (heap[parent].key <= node.key) break;
+          heap[index] = heap[parent];
+          index = parent;
+        }
+        heap[index] = node;
+      };
+      const pop = () => {
+        const node = heap[0], last = heap.pop();
+        pending.delete(node.key);
+        if (heap.length) {
+          let index = 0;
+          while (2 * index + 1 < heap.length) {
+            let child = 2 * index + 1;
+            if (child + 1 < heap.length && heap[child + 1].key < heap[child].key) child++;
+            if (last.key <= heap[child].key) break;
+            heap[index] = heap[child];
+            index = child;
+          }
+          heap[index] = last;
+        }
+        return node;
+      };
+      let completedProbability = 0, processed = 0;
+      const finish = (amount, probability) => {
+        completed.set(amount, (completed.get(amount) || 0) + probability);
+        completedProbability += probability;
+      };
+      const progress = 1 - playerProfile.miss * bossProfile.miss;
+      push(0, 0, 1);
+      while (heap.length && completedProbability < 1 - 1e-8 && processed < 200000 && heap.length < 100000) {
+        const state = pop();
+        processed++;
+        const mass = state.probability / progress;
+        const hp = playerHp - state.incoming * bossProfile.unit;
+        if (playerFirst) {
+          for (const own of playerProfile.outcomes) for (const enemy of bossProfile.outcomes) {
+            const probability = mass * own.probability * enemy.probability;
+            const amount = state.damage + own.damage;
+            if (enemy.damage >= hp) finish(amount, probability);
+            else if (own.damage || enemy.damage) push(state.incoming + enemy.damage / bossProfile.unit, amount, probability);
+          }
+        } else {
+          for (const enemy of bossProfile.outcomes) {
+            if (enemy.damage >= hp) { finish(state.damage, mass * enemy.probability); continue; }
+            for (const own of playerProfile.outcomes) {
+              if (own.damage || enemy.damage) push(state.incoming + enemy.damage / bossProfile.unit,
+                state.damage + own.damage, mass * enemy.probability * own.probability);
+            }
+          }
+        }
+      }
+      const tailFrom = heap.length ? heap[0].damage : null;
+      const outcomes = [...completed].filter(([amount]) => tailFrom === null || amount < tailFrom)
+        .map(([amount, probability]) => ({ damage: amount, probability })).sort((a, b) => a.damage - b.damage);
+      const total = outcomes.reduce((sum, outcome) => sum + outcome.probability, 0);
+      if (tailFrom === null) for (const outcome of outcomes) outcome.probability /= total;
+      return { status: "finite", outcomes, tailFrom,
+        tailProbability: tailFrom === null ? 0 : Math.max(0, Math.min(1, 1 - total)) };
+    }
+
+    function makeBossDamageBins(distribution) {
+      if (distribution.status !== "finite") return [];
+      const maximum = distribution.outcomes.length ? distribution.outcomes[distribution.outcomes.length - 1].damage : 0;
+      const upper = distribution.tailFrom === null ? maximum + 1 : distribution.tailFrom;
+      const rawWidth = Math.max(1, upper / 15);
+      const magnitude = 10 ** Math.floor(Math.log10(rawWidth));
+      const width = magnitude * [1, 2, 5, 10].find(step => step * magnitude >= rawWidth);
+      const bins = [];
+      for (let start = 0; start < upper; start += width) bins.push({ start, end: Math.min(start + width, upper), probability: 0, tail: false });
+      for (const outcome of distribution.outcomes) bins[Math.floor(outcome.damage / width)].probability += outcome.probability;
+      if (distribution.tailFrom !== null) bins.push({ start: distribution.tailFrom, end: Infinity, probability: distribution.tailProbability, tail: true });
+      return bins;
+    }
+
+    function bossDamageHistogramHtml(distribution, chartWidth = 760) {
+      if (distribution.status === "no_defeat") return `<p class="muted">Der Kampf endet nicht mit einer Niederlage. ${distribution.unbounded ? "Der Gesamtschaden ist unbegrenzt; dafür gibt es keine endliche Schadensverteilung." : "Es entsteht kein Schaden."}</p>`;
+      const bins = makeBossDamageBins(distribution);
+      const left = 60, top = 35, plotWidth = chartWidth - 80, plotHeight = 190;
+      const slot = plotWidth / bins.length;
+      const labelStride = Math.max(1, Math.ceil(55 / slot));
+      const hasTail = bins[bins.length - 1].tail;
+      const maxPercent = Math.max(10, Math.ceil(Math.max(...bins.map(bin => 100 * bin.probability)) / 10) * 10);
+      const label = value => value.toLocaleString("de-DE", value >= 10000 ? { notation: "compact", maximumFractionDigits: 1 } : {});
+      let content = '<title id="bossDamageChartTitle">Verteilung des Gesamtschadens am Treppenboss bis zur Niederlage</title>';
+      content += '<desc id="bossDamageChartDescription">Jeder Balken zeigt die Wahrscheinlichkeit eines Schadensbereichs. Ein Balken mit mindestens fasst den gesamten verbleibenden oberen Bereich zusammen.</desc>';
+      content += '<text x="60" y="18" font-size="12" fill="#595959">Wahrscheinlichkeit (%)</text>';
+      for (let i = 0; i <= 4; i++) {
+        const value = maxPercent * i / 4, y = top + plotHeight - plotHeight * i / 4;
+        content += `<line x1="${left}" y1="${y}" x2="${left + plotWidth}" y2="${y}" stroke="#e4e9e5"/>`;
+        content += `<text x="${left - 10}" y="${y + 4}" text-anchor="end" font-size="12" fill="#595959">${value.toLocaleString("de-DE", { maximumFractionDigits: 1 })}%</text>`;
+      }
+      bins.forEach((bin, i) => {
+        const height = plotHeight * 100 * bin.probability / maxPercent;
+        const range = bin.tail ? `mindestens ${bin.start.toLocaleString("de-DE")}` : `${bin.start.toLocaleString("de-DE")} bis unter ${bin.end.toLocaleString("de-DE")}`;
+        content += `<rect x="${left + (i + .08) * slot}" y="${top + plotHeight - height}" width="${slot * .84}" height="${height}" rx="3" fill="${bin.tail ? "#718278" : "#37805a"}"><title>${range} Schaden: ${percent(bin.probability)}</title></rect>`;
+        if (bin.tail || (i % labelStride === 0 && (!hasTail || (bins.length - 1 - i) * slot >= 55))) {
+          content += `<text x="${left + (i + .5) * slot}" y="247" text-anchor="middle" font-size="11" fill="#444">${bin.tail ? "≥ " : ""}${label(bin.start)}</text>`;
+        }
+      });
+      content += `<text x="${left + plotWidth / 2}" y="285" text-anchor="middle" font-size="13" fill="#444">Gesamtschaden am Treppenboss</text>`;
+      const tailNote = distribution.tailFrom === null ? "" : `<p class="stat-note">Der letzte Balken fasst alle Schäden ab ${distribution.tailFrom.toLocaleString("de-DE")} zusammen: ${distribution.tailProbability < .0001 ? "unter 0,01%" : percent(distribution.tailProbability)}.</p>`;
+      return `<h3>Verteilung des Gesamtschadens</h3><p class="muted">Die Balkenhöhe zeigt die Wahrscheinlichkeit des jeweiligen Schadensbereichs.</p><div class="histogram-scroll"><svg class="survival-histogram" viewBox="0 0 ${chartWidth} 310" role="img" aria-labelledby="bossDamageChartTitle bossDamageChartDescription" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">${content}</svg></div>${tailNote}`;
+    }
+
+    function renderBossDamageDistribution() {
+      const panel = document.getElementById("bossDamageDistribution");
+      if (panel && lastCalculation?.mode === "treppenboss") panel.innerHTML = bossDamageHistogramHtml(lastCalculation.damageDistribution,
+        Math.max(280, Math.min(760, panel.clientWidth || 760)));
+    }
+
+    function calculateTreppenbossCombat(player, boss, includeDistribution = true) {
       const playerProfile = combatTurnProfile(player, boss);
       const bossProfile = combatTurnProfile(boss, player);
       const avgRounds = survivalTurnExpectations(player.maxHp, bossProfile)[player.maxHp];
@@ -565,9 +729,12 @@
       const avgAttacks = avgTurns * (1 + playerProfile.extra);
       const avgLandedHits = avgAttacks * playerProfile.hit;
       const avgDamage = playerProfile.expectedDamagePerAttack === 0 ? 0 : avgAttacks * playerProfile.expectedDamagePerAttack;
+      const bossAttacks = survivalTurnExpectations(player.maxHp, bossProfile, true)[player.maxHp];
       return { mode: "treppenboss", avgDamage, avgRounds, avgTurns, avgAttacks, avgLandedHits,
         playerDamage: playerProfile.baseDamage, bossDamage: bossProfile.baseDamage,
-        playerProfile, bossProfile };
+        playerProfile, bossProfile,
+        combatStats: combatStatistics(playerProfile, bossProfile, avgRounds, avgTurns, avgRounds, avgAttacks, bossAttacks),
+        damageDistribution: includeDistribution ? bossDamageDistribution(player.maxHp, playerProfile, bossProfile, player.spd >= boss.spd) : null };
     }
 
     function treppenbossResultHtml(player, boss, result) {
@@ -581,6 +748,8 @@
             <div class="outcome-card"><div class="reserve-value">${formatReserve(result.avgRounds)}</div><p class="muted">Ø Runden bis zur Niederlage</p></div>
             <div class="outcome-card"><div class="reserve-value">${formatReserve(result.avgLandedHits)}</div><p class="muted">Ø gelandete Treffer</p></div>
           </div>
+          <div id="bossDamageDistribution">${bossDamageHistogramHtml(result.damageDistribution)}</div>
+          ${combatStatisticsHtml(result.combatStats)}
           ${result.bossDamage === 0 ? '<p class="muted">Der Treppenboss verursacht mit der aktuellen Formel keinen Schaden. Der Kampf endet nicht; ∞ steht für einen unbegrenzten Erwartungswert.</p>' : ""}
           <p class="muted">Ausweichen, kritische Treffer, Doppeltreffer und die Angriffsreihenfolge sind berücksichtigt. Alle Formeln sind vorläufig.</p>
         </section>
@@ -612,6 +781,7 @@
       const firstSurvival = survivalTurnExpectations(first.maxHp, secondProfile);
       const secondSurvival = survivalTurnExpectations(second.maxHp, firstProfile);
       const outcomes = [];
+      let firstTurns = 0, secondTurns = 0, firstAttacks = 0, secondAttacks = 0;
       function addOutcome(side, hp, probability, survival) {
         if (probability > 0) outcomes.push({ winner: side, probability, remainingHp: hp,
           extraRounds: Math.max(0, survival[hp] - 1) });
@@ -622,15 +792,28 @@
         for (const item of outcomes) item.probability /= total;
         const p1WinRate = outcomes.filter(item => item.winner === "p1").reduce((sum, item) => sum + item.probability, 0);
         const p2WinRate = outcomes.filter(item => item.winner === "p2").reduce((sum, item) => sum + item.probability, 0);
-        return { p1WinRate, p2WinRate, drawRate: drawRate / total, avgRounds: avgRounds / total, outcomes };
+        const stats = firstIsPlayer
+          ? combatStatistics(firstProfile, secondProfile, avgRounds / total, firstTurns / total, secondTurns / total, firstAttacks / total, secondAttacks / total)
+          : combatStatistics(secondProfile, firstProfile, avgRounds / total, secondTurns / total, firstTurns / total, secondAttacks / total, firstAttacks / total);
+        return { p1WinRate, p2WinRate, drawRate: drawRate / total, avgRounds: avgRounds / total, outcomes, combatStats: stats };
       }
-      if (!firstProfile.unit && !secondProfile.unit) return finish(Infinity, 1);
+      if (!firstProfile.unit && !secondProfile.unit) {
+        firstTurns = secondTurns = firstAttacks = secondAttacks = Infinity;
+        return finish(Infinity, 1);
+      }
       if (!secondProfile.unit) {
         addOutcome(firstSide, first.maxHp, 1, firstSurvival);
+        firstTurns = secondSurvival[second.maxHp];
+        secondTurns = firstTurns - 1;
+        firstAttacks = survivalTurnExpectations(second.maxHp, firstProfile, true)[second.maxHp];
+        secondAttacks = secondTurns * (1 + secondProfile.extra);
         return finish(secondSurvival[second.maxHp]);
       }
       if (!firstProfile.unit) {
         addOutcome(secondSide, second.maxHp, 1, secondSurvival);
+        firstTurns = secondTurns = firstSurvival[first.maxHp];
+        firstAttacks = firstTurns * (1 + firstProfile.extra);
+        secondAttacks = survivalTurnExpectations(first.maxHp, secondProfile, true)[first.maxHp];
         return finish(firstSurvival[first.maxHp]);
       }
       // Track cumulative damage in units of its greatest common divisor. This
@@ -659,12 +842,16 @@
           avgRounds += roundMass;
           const firstHp = first.maxHp - j * secondProfile.unit;
           const secondHp = second.maxHp - i * firstProfile.unit;
+          firstTurns += roundMass;
+          firstAttacks += roundMass * expectedTurnAttempts(firstProfile, secondHp);
           for (const firstOutcome of firstProfile.outcomes) {
             const probability = roundMass * firstOutcome.probability;
             if (firstOutcome.damage >= secondHp) {
               firstWins[firstHp] += probability;
               continue; // Death prevents the opponent's entire turn.
             }
+            secondTurns += probability;
+            secondAttacks += probability * expectedTurnAttempts(secondProfile, firstHp);
             for (const secondOutcome of secondProfile.outcomes) {
               if (secondOutcome.damage >= firstHp) {
                 secondWins[secondHp - firstOutcome.damage] += probability * secondOutcome.probability;
@@ -688,7 +875,7 @@
 
     // Keep the existing suggestion calculator usable with deterministic results.
     function estimateWinRate(p1, p2) {
-      if (p2.isTreppenboss) return { winRate: 0, avgRounds: calculateTreppenbossCombat(p1, p2).avgRounds };
+      if (p2.isTreppenboss) return { winRate: 0, avgRounds: calculateTreppenbossCombat(p1, p2, false).avgRounds };
       const result = calculateExactCombat(p1, p2);
       return { winRate: result.p1WinRate, avgRounds: result.avgRounds };
     }
@@ -737,11 +924,14 @@
       }
       const { p1, p2 } = readFighters();
       const detailsOpen = panel.querySelector(".calculation-details")?.open || false;
+      const statisticsOpen = panel.querySelector(".combat-statistics")?.open || false;
       if (p2.isTreppenboss) {
         lastCalculation = calculateTreppenbossCombat(p1, p2);
         updateCalculatedStats();
         panel.innerHTML = treppenbossResultHtml(p1, p2, lastCalculation);
+        renderBossDamageDistribution();
         if (detailsOpen) panel.querySelector(".calculation-details").open = true;
+        if (statisticsOpen) panel.querySelector(".combat-statistics").open = true;
         return;
       }
       try {
@@ -759,9 +949,11 @@
         ${calculationHeaderHtml("Berechnung abgeschlossen")}
         ${calculationDetailsHtml(p1, p2)}
         <section aria-label="Siegchancen und Überlebensreserve"><div id="survivalDistribution"></div></section>
+        ${combatStatisticsHtml(lastCalculation.combatStats)}
       `;
       renderSurvivalDistribution();
       if (detailsOpen) panel.querySelector(".calculation-details").open = true;
+      if (statisticsOpen) panel.querySelector(".combat-statistics").open = true;
     }
 
     function calculationDetailsHtml(p1, p2) {
@@ -1357,6 +1549,7 @@
       clearTimeout(survivalResizeTimer);
       survivalResizeTimer = setTimeout(() => {
         if (document.getElementById("survivalDistribution")) renderSurvivalDistribution();
+        if (document.getElementById("bossDamageDistribution")) renderBossDamageDistribution();
       }, 150);
     });
     window.addEventListener("storage", event => {
